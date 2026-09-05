@@ -1,0 +1,15 @@
+* text=auto eol=lf
+
+*.py text diff=python
+*.ts text diff=typescript
+*.tsx text diff=typescript
+*.json text
+*.yaml text
+*.yml text
+
+# Generated releases should preserve binary bytes if committed intentionally.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary

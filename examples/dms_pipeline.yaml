@@ -1,0 +1,95 @@
+diagram:
+  title: DMS Algorithm Pipeline
+  subtitle: Example of a pipeline-oriented engineering diagram
+  direction: TB
+  width: 1500
+
+groups:
+  - id: ingest
+    label: Input
+    kind: layer
+    order: 10
+    style: application
+
+  - id: perception
+    label: Perception
+    kind: layer
+    order: 20
+    style: api
+
+  - id: state
+    label: State Estimation
+    kind: layer
+    order: 30
+    style: runtime
+
+  - id: decision
+    label: Decision
+    kind: layer
+    order: 40
+    style: hardware
+
+nodes:
+  - id: camera
+    label: Camera / Video
+    type: application
+    group: ingest
+
+  - id: quality
+    label: Image Quality
+    type: algorithm
+    group: perception
+
+  - id: detection
+    label: Driver / Face / Eye Detection
+    type: algorithm
+    group: perception
+
+  - id: headpose
+    label: Head Pose
+    type: algorithm
+    group: state
+
+  - id: eye_state
+    label: Eye State
+    type: algorithm
+    group: state
+
+  - id: temporal
+    label: Temporal Decision
+    type: module
+    group: decision
+
+  - id: alarm
+    label: Alarm / Suppression
+    type: service
+    group: decision
+
+edges:
+  - source: camera
+    target: quality
+    kind: main
+
+  - source: quality
+    target: detection
+    kind: main
+
+  - source: detection
+    target: headpose
+    kind: main
+
+  - source: detection
+    target: eye_state
+    kind: main
+
+  - source: headpose
+    target: temporal
+    kind: main
+
+  - source: eye_state
+    target: temporal
+    kind: main
+
+  - source: temporal
+    target: alarm
+    kind: critical

@@ -1,0 +1,37 @@
+canvas:
+  fill: "#FFFFFF"
+
+text:
+  primary: "#111827"
+  secondary: "#4B5563"
+  muted: "#6B7280"
+  font_family: "Arial, Microsoft YaHei, sans-serif"
+
+node:
+  default:
+    fill: "#FFFFFF"
+    stroke: "#4B5563"
+    text: "#111827"
+
+group:
+  default:
+    fill: "#FAFAFA"
+    stroke: "#9CA3AF"
+
+edge:
+  main:
+    stroke: "#374151"
+    width: 2.0
+    dash: ""
+  secondary:
+    stroke: "#6B7280"
+    width: 1.5
+    dash: "5 4"
+  critical:
+    stroke: "#111827"
+    width: 3.0
+    dash: ""
+  async:
+    stroke: "#6B7280"
+    width: 1.5
+    dash: "2 3"

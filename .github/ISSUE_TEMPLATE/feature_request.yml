@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a focused improvement
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "For major changes, describe the user problem before prescribing an implementation."
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What workflow is difficult today and who is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe expected behavior, examples and any non-goals.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to help test or implement this feature.
+          required: false

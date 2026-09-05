@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible problem in the compiler or Studio
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for helping improve DiagramC. Do not include tokens, API keys, private diagrams, or other sensitive data."
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Start DiagramC with ...
+        2. Import or create ...
+        3. Click ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots, or source snippet
+      description: Remove all credentials and private content before posting.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: DiagramC version or commit
+      placeholder: "v0.1.0 or abc1234"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Python CLI/compiler
+        - Studio editor
+        - SVG import/export
+        - AI provider gateway
+        - LAN/token access
+        - Documentation

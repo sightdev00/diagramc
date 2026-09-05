@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://diagramc.dev/schemas/diagram-v2.schema.json",
+  "title": "DiagramC Document V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "document", "elements", "relations"],
+  "properties": {
+    "schemaVersion": { "const": "2.0" },
+    "document": { "$ref": "#/$defs/documentMeta" },
+    "elements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/element" },
+      "default": []
+    },
+    "relations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relation" },
+      "default": []
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/constraint" },
+      "default": []
+    },
+    "layouts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/layout" },
+      "default": {}
+    },
+    "presentation": { "$ref": "#/$defs/presentation" },
+    "assets": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/asset" },
+      "default": {}
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "openData": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "documentMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "diagramType"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 4096 },
+        "diagramType": { "$ref": "#/$defs/identifier" },
+        "revision": { "type": "integer", "minimum": 0, "default": 0 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "direction": {
+          "type": "string",
+          "enum": ["in", "out", "inout"],
+          "default": "inout"
+        },
+        "side": {
+          "type": "string",
+          "enum": ["top", "right", "bottom", "left", "auto"],
+          "default": "auto"
+        },
+        "data": { "$ref": "#/$defs/openData" }
+      }
+    },
+    "element": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "semanticType", "data"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "kind": {
+          "type": "string",
+          "enum": ["node", "group", "lane", "note", "image"]
+        },
+        "semanticType": { "$ref": "#/$defs/identifier" },
+        "parentId": {
+          "anyOf": [
+            { "$ref": "#/$defs/identifier" },
+            { "type": "null" }
+          ]
+        },
+        "data": { "$ref": "#/$defs/openData" },
+        "ports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/port" },
+          "default": []
+        },
+        "styleRef": { "$ref": "#/$defs/identifier" },
+        "extensions": { "$ref": "#/$defs/openData" }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["elementId"],
+      "properties": {
+        "elementId": { "$ref": "#/$defs/identifier" },
+        "portId": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "semanticType", "source", "target", "data"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "kind": {
+          "type": "string",
+          "enum": ["directed", "undirected"]
+        },
+        "semanticType": { "$ref": "#/$defs/identifier" },
+        "source": { "$ref": "#/$defs/endpoint" },
+        "target": { "$ref": "#/$defs/endpoint" },
+        "data": { "$ref": "#/$defs/openData" },
+        "styleRef": { "$ref": "#/$defs/identifier" },
+        "extensions": { "$ref": "#/$defs/openData" }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "type": { "$ref": "#/$defs/identifier" },
+        "subject": { "$ref": "#/$defs/identifier" },
+        "reference": { "$ref": "#/$defs/identifier" },
+        "elements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" },
+          "default": []
+        },
+        "value": {}
+      }
+    },
+    "layoutOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pinned": { "type": "boolean", "default": false },
+        "position": { "$ref": "#/$defs/point" },
+        "size": { "$ref": "#/$defs/size" },
+        "collapsed": { "type": "boolean", "default": false }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "profile"],
+      "properties": {
+        "engine": { "$ref": "#/$defs/identifier" },
+        "profile": { "$ref": "#/$defs/identifier" },
+        "direction": {
+          "type": "string",
+          "enum": ["UP", "RIGHT", "DOWN", "LEFT"]
+        },
+        "options": { "$ref": "#/$defs/openData" },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/layoutOverride" },
+          "default": {}
+        }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "theme": { "$ref": "#/$defs/identifier" },
+        "target": { "$ref": "#/$defs/identifier" },
+        "styles": { "$ref": "#/$defs/openData" }
+      },
+      "default": {}
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "uri"],
+      "properties": {
+        "type": { "type": "string", "enum": ["image", "font", "file"] },
+        "uri": { "type": "string", "minLength": 1 },
+        "mimeType": { "type": "string" },
+        "checksum": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+.github/
+  workflows/
+    ci.yml
+.gitignore
+LICENSE
+Makefile
+README.md
+TEST_STATUS.txt
+TREE.txt
+dist/
+  llm_deployment_stack.mmd
+  llm_deployment_stack.svg
+docs/
+  ARCHITECTURE.md
+  CODEMAP.md
+  FIGMA.md
+  ROADMAP.md
+  architecture.mmd
+examples/
+  dms_pipeline.yaml
+  llm_deployment_stack.yaml
+pyproject.toml
+scripts/
+  demo.sh
+src/
+  archviz/
+    __init__.py
+    cli.py
+    compiler.py
+    layout/
+      __init__.py
+      layered.py
+    models.py
+    parser.py
+    render/
+      __init__.py
+      mermaid.py
+      svg.py
+    theme.py
+    validator.py
+tests/
+  test_layout.py
+  test_parser.py
+  test_render.py
+  test_validator.py
+themes/
+  engineering.yaml
+  presentation.yaml

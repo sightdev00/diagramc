@@ -1,0 +1,13 @@
+Validation status for the GitHub-ready alpha baseline:
+
+- Python syntax and Ruff quality gate: tracked in CI
+- Python tests: 36 passed locally on 2026-09-05
+- Web type check: passed locally on 2026-09-05
+- Web production build: passed locally on 2026-09-05
+- Example SVG and Mermaid generation: covered by the test suite and demo script
+
+Run the complete local gate with:
+
+```bash
+make check
+```

@@ -1,0 +1,186 @@
+diagram:
+  title: 大模型部署方式图谱
+  subtitle: Application → API → Runtime → Product → Model / Hardware
+  direction: TB
+  width: 1600
+  margin: 40
+
+groups:
+  - id: application
+    label: "1. 应用层 / Agent"
+    kind: layer
+    order: 10
+    style: application
+
+  - id: api
+    label: "2. 统一接口层"
+    kind: layer
+    order: 20
+    style: api
+
+  - id: runtime
+    label: "3. 推理 Runtime（核心）"
+    kind: layer
+    order: 30
+    style: runtime
+
+  - id: product
+    label: "4. 封装层 / 产品层"
+    kind: layer
+    order: 40
+    style: product
+
+  - id: hardware
+    label: "5. 模型与硬件层"
+    kind: layer
+    order: 50
+    style: hardware
+
+nodes:
+  - id: codex
+    label: Codex / SDK
+    type: application
+    group: application
+
+  - id: hermes
+    label: Hermes Agent
+    type: agent
+    group: application
+
+  - id: chat_ui
+    label: Chat UI
+    type: application
+    group: application
+    description:
+      - OpenClaw / Pi
+
+  - id: openai_api
+    label: OpenAI-compatible API
+    type: api
+    group: api
+
+  - id: gateway
+    label: Gateway
+    type: gateway
+    group: api
+    description:
+      - 鉴权 / 限流 / 日志
+
+  - id: vllm
+    label: vLLM
+    type: runtime
+    group: runtime
+    description:
+      - GPU 常驻
+      - 高并发 / TP / EP
+
+  - id: sglang
+    label: SGLang
+    type: runtime
+    group: runtime
+    description:
+      - 高性能 Serving
+      - MoE / 长上下文
+
+  - id: llama_cpp
+    label: llama.cpp
+    type: runtime
+    group: runtime
+    description:
+      - GGUF / Offload
+      - CPU + GPU 异构
+
+  - id: tensorrt
+    label: TensorRT-LLM
+    type: runtime
+    group: runtime
+    description:
+      - NVIDIA
+      - 极致优化
+
+  - id: ollama
+    label: Ollama
+    type: service
+    group: product
+
+  - id: lmstudio
+    label: LM Studio
+    type: service
+    group: product
+
+  - id: jan
+    label: Jan
+    type: service
+    group: product
+
+  - id: docker_runner
+    label: Docker Model Runner
+    type: service
+    group: product
+
+  - id: gpu_resident
+    label: GPU 常驻式
+    type: gpu
+    group: hardware
+    description:
+      - Safetensors / FP8 / AWQ / GPTQ
+      - 模型完整驻显存
+
+  - id: hybrid
+    label: 异构内存式
+    type: cpu
+    group: hardware
+    description:
+      - GGUF
+      - GPU + CPU RAM / NVMe
+
+edges:
+  - source: hermes
+    target: openai_api
+    kind: main
+
+  - source: openai_api
+    target: sglang
+    kind: main
+
+  - source: vllm
+    target: ollama
+    kind: secondary
+
+  - source: sglang
+    target: lmstudio
+    kind: secondary
+
+  - source: llama_cpp
+    target: jan
+    kind: critical
+    label: 推荐实验
+
+  - source: tensorrt
+    target: docker_runner
+    kind: secondary
+
+  - source: ollama
+    target: gpu_resident
+    kind: secondary
+
+  - source: lmstudio
+    target: gpu_resident
+    kind: secondary
+
+  - source: jan
+    target: hybrid
+    kind: critical
+
+  - source: docker_runner
+    target: gpu_resident
+    kind: secondary
+
+annotations:
+  - id: baseline
+    label: "当前基线：Qwen3.8-27B-FP8 → vLLM → 2×4090"
+    target: vllm
+
+  - id: experiment
+    label: "推荐实验：Flash-Next GGUF → llama.cpp → 2×4090 + 128GB RAM"
+    target: llama_cpp
