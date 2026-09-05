@@ -23,6 +23,9 @@ htmlcov/
 node_modules/
 apps/web/node_modules/
 apps/web/dist/
+playwright-report/
+test-results/
+blob-report/
 *.tsbuildinfo
 *.log
 

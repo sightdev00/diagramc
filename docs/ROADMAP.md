@@ -8,8 +8,9 @@
 - [x] AI command preview, manual apply, history and replay.
 - [x] SVG fidelity/structured import and editable fidelity-SVG source.
 - [x] Local and protected LAN Studio serving.
-- [ ] GitHub release workflow, Docker image and public demo gallery.
-- [ ] Browser E2E test suite and coverage reporting.
+- [x] GitHub release workflow and Docker image definition (publishes on matching `v*` tags).
+- [x] Browser E2E smoke suite for core Studio editing and export.
+- [ ] Public demo gallery and browser coverage reporting.
 
 ## v0.2.0 — AI source workflow
 

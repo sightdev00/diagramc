@@ -64,6 +64,17 @@ For a non-loopback listener, DiagramC automatically creates or reuses an access 
 
 The token is an access-control mechanism, not TLS. For untrusted networks, place DiagramC behind HTTPS, a VPN, or an authenticated reverse proxy.
 
+### Docker
+
+The container serves Studio on port `8765`. Both Studio state and the automatic LAN token are kept in the `/data` volume.
+
+```bash
+docker run --rm -p 8765:8765 -v diagramc-data:/data \
+  ghcr.io/sightdev00/diagramc:latest
+```
+
+The first startup prints a protected URL with a generated token. To set a token yourself, pass `-e DIAGRAMC_TOKEN='a-long-random-value'`. Published images are created only for version tags and use `ghcr.io/sightdev00/diagramc:<version>`.
+
 ## Compiler quick start
 
 ```bash
@@ -92,6 +103,7 @@ make lint          # Ruff linting
 make format-check  # Ruff formatting check
 pnpm typecheck     # TypeScript check
 pnpm build         # Production web build
+pnpm e2e           # Chromium Studio smoke test
 ```
 
 ## Documentation

@@ -14,6 +14,7 @@
     "format": "ruff format src tests && biome format --write apps/web/src",
     "format:web:check": "biome format apps/web/src",
     "format:check": "ruff format --check src tests && pnpm format:web:check",
+    "e2e": "pnpm --dir apps/web e2e",
     "check": "pnpm lint && pnpm format:check && pnpm test && pnpm typecheck && pnpm build"
   },
   "devDependencies": {

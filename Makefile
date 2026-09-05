@@ -1,4 +1,4 @@
-.PHONY: install web-install test lint format format-check typecheck build check demo schema
+.PHONY: install web-install test lint format format-check typecheck build e2e check demo schema
 
 install:
 	pip install -e ".[dev]"
@@ -26,6 +26,9 @@ typecheck:
 
 build:
 	pnpm build
+
+e2e:
+	pnpm e2e
 
 check: lint format-check test typecheck build
 
