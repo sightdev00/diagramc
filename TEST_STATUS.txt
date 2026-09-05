@@ -1,13 +1,16 @@
 Validation status for the GitHub-ready alpha baseline:
 
-- Python syntax and Ruff quality gate: tracked in CI
-- Python tests: 36 passed locally on 2026-09-05
-- Web type check: passed locally on 2026-09-05
-- Web production build: passed locally on 2026-09-05
-- Example SVG and Mermaid generation: covered by the test suite and demo script
+- Python syntax and Ruff quality gate: passed locally and in CI on Python 3.10, 3.11 and 3.12.
+- Python tests: 36 passed locally on 2026-09-06.
+- Web lint, formatting, production type check and Vite build: passed locally and in CI.
+- Chromium Studio E2E: passed locally and in CI; covers creating a diagram, renaming it, adding a node and JSON export.
+- Docker image build: passed in CI on 2026-09-06.
+- Python wheel build and `v0.1.0` release-tag/version validation: passed locally.
+- Example SVG and Mermaid generation: covered by the Python test suite and demo script.
 
-Run the complete local gate with:
+Run the standard local gate with:
 
 ```bash
 make check
+pnpm e2e
 ```
