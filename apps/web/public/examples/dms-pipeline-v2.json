@@ -1,0 +1,253 @@
+{
+  "schemaVersion": "2.0",
+  "document": {
+    "id": "dms_pipeline",
+    "title": "DMS Algorithm Pipeline",
+    "description": "Example of a pipeline-oriented engineering diagram",
+    "diagramType": "architecture",
+    "revision": 0
+  },
+  "elements": [
+    {
+      "id": "ingest",
+      "kind": "group",
+      "semanticType": "group.layer",
+      "data": {
+        "label": "Input",
+        "order": 10,
+        "legacyStyle": "application"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "perception",
+      "kind": "group",
+      "semanticType": "group.layer",
+      "data": {
+        "label": "Perception",
+        "order": 20,
+        "legacyStyle": "api"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "state",
+      "kind": "group",
+      "semanticType": "group.layer",
+      "data": {
+        "label": "State Estimation",
+        "order": 30,
+        "legacyStyle": "runtime"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "decision",
+      "kind": "group",
+      "semanticType": "group.layer",
+      "data": {
+        "label": "Decision",
+        "order": 40,
+        "legacyStyle": "hardware"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "camera",
+      "kind": "node",
+      "semanticType": "architecture.application",
+      "parentId": "ingest",
+      "data": {
+        "label": "Camera / Video"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "quality",
+      "kind": "node",
+      "semanticType": "architecture.algorithm",
+      "parentId": "perception",
+      "data": {
+        "label": "Image Quality"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "detection",
+      "kind": "node",
+      "semanticType": "architecture.algorithm",
+      "parentId": "perception",
+      "data": {
+        "label": "Driver / Face / Eye Detection"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "headpose",
+      "kind": "node",
+      "semanticType": "architecture.algorithm",
+      "parentId": "state",
+      "data": {
+        "label": "Head Pose"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "eye_state",
+      "kind": "node",
+      "semanticType": "architecture.algorithm",
+      "parentId": "state",
+      "data": {
+        "label": "Eye State"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "temporal",
+      "kind": "node",
+      "semanticType": "architecture.module",
+      "parentId": "decision",
+      "data": {
+        "label": "Temporal Decision"
+      },
+      "ports": [],
+      "extensions": {}
+    },
+    {
+      "id": "alarm",
+      "kind": "node",
+      "semanticType": "architecture.service",
+      "parentId": "decision",
+      "data": {
+        "label": "Alarm / Suppression"
+      },
+      "ports": [],
+      "extensions": {}
+    }
+  ],
+  "relations": [
+    {
+      "id": "edge:camera:quality:1",
+      "kind": "directed",
+      "semanticType": "relation.main",
+      "source": {
+        "elementId": "camera"
+      },
+      "target": {
+        "elementId": "quality"
+      },
+      "data": {},
+      "extensions": {}
+    },
+    {
+      "id": "edge:quality:detection:2",
+      "kind": "directed",
+      "semanticType": "relation.main",
+      "source": {
+        "elementId": "quality"
+      },
+      "target": {
+        "elementId": "detection"
+      },
+      "data": {},
+      "extensions": {}
+    },
+    {
+      "id": "edge:detection:headpose:3",
+      "kind": "directed",
+      "semanticType": "relation.main",
+      "source": {
+        "elementId": "detection"
+      },
+      "target": {
+        "elementId": "headpose"
+      },
+      "data": {},
+      "extensions": {}
+    },
+    {
+      "id": "edge:detection:eye_state:4",
+      "kind": "directed",
+      "semanticType": "relation.main",
+      "source": {
+        "elementId": "detection"
+      },
+      "target": {
+        "elementId": "eye_state"
+      },
+      "data": {},
+      "extensions": {}
+    },
+    {
+      "id": "edge:headpose:temporal:5",
+      "kind": "directed",
+      "semanticType": "relation.main",
+      "source": {
+        "elementId": "headpose"
+      },
+      "target": {
+        "elementId": "temporal"
+      },
+      "data": {},
+      "extensions": {}
+    },
+    {
+      "id": "edge:eye_state:temporal:6",
+      "kind": "directed",
+      "semanticType": "relation.main",
+      "source": {
+        "elementId": "eye_state"
+      },
+      "target": {
+        "elementId": "temporal"
+      },
+      "data": {},
+      "extensions": {}
+    },
+    {
+      "id": "edge:temporal:alarm:7",
+      "kind": "directed",
+      "semanticType": "relation.critical",
+      "source": {
+        "elementId": "temporal"
+      },
+      "target": {
+        "elementId": "alarm"
+      },
+      "data": {},
+      "extensions": {}
+    }
+  ],
+  "constraints": [],
+  "layouts": {
+    "default": {
+      "engine": "simple-layered",
+      "profile": "layered",
+      "direction": "DOWN",
+      "options": {
+        "canvasWidth": 1500,
+        "margin": 40
+      },
+      "overrides": {}
+    }
+  },
+  "presentation": {
+    "theme": "engineering",
+    "target": "document",
+    "styles": {}
+  },
+  "assets": {},
+  "extensions": {},
+  "metadata": {
+    "migratedFrom": "archviz-v1"
+  }
+}

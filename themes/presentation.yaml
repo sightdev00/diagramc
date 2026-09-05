@@ -1,0 +1,28 @@
+canvas:
+  fill: "#F8FAFC"
+
+text:
+  primary: "#0F2742"
+  secondary: "#475467"
+  muted: "#667085"
+  font_family: "Arial, Microsoft YaHei, sans-serif"
+
+group:
+  application:
+    fill: "#F0FBF4"
+    stroke: "#2FA55D"
+  api:
+    fill: "#F2F8FF"
+    stroke: "#2C7FD0"
+  runtime:
+    fill: "#FFF7F6"
+    stroke: "#E44B3D"
+  product:
+    fill: "#FAF7FF"
+    stroke: "#8259C8"
+  hardware:
+    fill: "#FFFBF5"
+    stroke: "#E4931C"
+  callout:
+    fill: "#FFFBF4"
+    stroke: "#E59622"

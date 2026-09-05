@@ -1,0 +1,21 @@
+{
+  "name": "diagramc-workspace",
+  "private": true,
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@11.0.8",
+  "scripts": {
+    "dev": "pnpm --dir apps/web dev",
+    "build": "pnpm --dir apps/web build",
+    "typecheck": "pnpm --dir apps/web typecheck",
+    "test": "python3 -m pytest -q",
+    "lint:python": "ruff check src tests",
+    "lint:web": "biome lint apps/web/src",
+    "lint": "pnpm lint:python && pnpm lint:web",
+    "format": "ruff format src tests && biome format --write apps/web/src",
+    "format:check": "ruff format --check src tests && biome format apps/web/src",
+    "check": "pnpm lint && pnpm format:check && pnpm test && pnpm typecheck && pnpm build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.12"
+  }
+}

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/sightdev00/diagramc/security/advisories
+    about: Do not report security vulnerabilities in public issues.
+  - name: Support and questions
+    url: https://github.com/sightdev00/diagramc/discussions
+    about: Use GitHub Discussions when enabled for questions and workflows.

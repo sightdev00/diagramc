@@ -1,0 +1,39 @@
+flowchart LR
+    subgraph INPUT["Input"]
+        YAML["YAML"]
+        JSON["JSON"]
+    end
+
+    subgraph CORE["Compiler Core"]
+        PARSER["Parser<br/>load_diagram()"]
+        IR["Canonical IR<br/>Diagram / Node / Edge / Group"]
+        VALIDATOR["Validator<br/>validate_diagram()"]
+        LAYOUT["Layout Engine<br/>layout_diagram()"]
+        THEME["Theme Engine<br/>load_theme()"]
+    end
+
+    subgraph RENDER["Renderers"]
+        SVG["SVG Renderer<br/>Figma-friendly"]
+        MMD["Mermaid Renderer"]
+    end
+
+    subgraph OUTPUT["Artifacts"]
+        FIGMA["Figma"]
+        DOCS["Docs / Feishu / GitHub"]
+        SVGFILE["*.svg"]
+        MMDFILE["*.mmd"]
+    end
+
+    YAML --> PARSER
+    JSON --> PARSER
+    PARSER --> IR
+    IR --> VALIDATOR
+    VALIDATOR --> LAYOUT
+    THEME --> SVG
+    LAYOUT --> SVG
+    IR --> MMD
+    SVG --> SVGFILE
+    SVGFILE --> FIGMA
+    SVGFILE --> DOCS
+    MMD --> MMDFILE
+    MMDFILE --> DOCS
