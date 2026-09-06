@@ -1,62 +1,195 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { expect, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => {
+  await page.coverage.startJSCoverage({ resetOnNavigation: false });
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  const entries = (await page.coverage.stopJSCoverage()).filter((entry) =>
+    entry.url.includes("/src/"),
+  );
+  const functions = entries.flatMap((entry) => entry.functions);
+  const coveredFunctions = functions.filter((entry) =>
+    entry.ranges.some((range) => range.count > 0),
+  ).length;
+  const coverage = {
+    sourceEntries: entries.map((entry) => entry.url),
+    functionCount: functions.length,
+    coveredFunctions,
+  };
+  const coverageDirectory = join(process.cwd(), "e2e-coverage");
+  await mkdir(coverageDirectory, { recursive: true });
+  await writeFile(
+    join(coverageDirectory, testInfo.testId.replace(/[^a-zA-Z0-9_-]/g, "-") + ".json"),
+    JSON.stringify(coverage, null, 2),
+  );
+  await testInfo.attach("v8-source-coverage", {
+    body: Buffer.from(JSON.stringify(coverage, null, 2)),
+    contentType: "application/json",
+  });
+  expect(entries.some((entry) => entry.url.includes("/src/App.tsx"))).toBe(true);
+  expect(coveredFunctions).toBeGreaterThan(0);
+});
 
 test("creates, renames, edits, and exports a diagram", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByText("DiagramC", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "\u65b0\u5efa\u56fe" }).click();
+  await page.getByRole("button", { name: "新建图" }).click();
 
-  const title = page.getByLabel("\u56fe\u540d\u79f0");
+  const title = page.getByLabel("图名称");
   await title.fill("E2E Architecture");
   await title.press("Enter");
   await expect(title).toHaveValue("E2E Architecture");
 
   await page.locator("select.element-picker").selectOption("process");
-  await page.getByRole("button", { name: "\uff0b \u6dfb\u52a0" }).click();
-  await expect(page.getByRole("button", { name: "\u21b6 \u64a4\u9500" })).toBeEnabled();
+  await page.getByRole("button", { name: "＋ 添加" }).click();
+  await expect(page.getByRole("button", { name: "↶ 撤销" })).toBeEnabled();
 
-  const download = await Promise.all([
+  const jsonDownload = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "\u5bfc\u51fa JSON" }).click(),
+    page.getByRole("button", { name: "导出 JSON" }).click(),
   ]);
-  expect(download[0].suggestedFilename()).toMatch(/E2E Architecture.*\.json/);
-});
+  expect(jsonDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.json/);
 
+  const svgDownload = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "导出 SVG" }).click(),
+  ]);
+  expect(svgDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.svg/);
+
+  const pngDownload = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "导出 PNG" }).click(),
+  ]);
+  expect(pngDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.png/);
+});
 
 test("imports an editable Mermaid flowchart source", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "\u5e94\u7528 Mermaid" }).click();
+  await page.getByRole("button", { name: "应用 Mermaid" }).click();
 
-  await page.getByRole("textbox", { name: "Mermaid \u6e90\u7801" }).fill(`%% title: AI Flow
+  await page.getByRole("textbox", { name: "Mermaid 源码" }).fill(`%% title: AI Flow
 flowchart LR
   subgraph core[Core]
     A[Input] -->|valid| B{Check}
     B -.-> C[(Store)]
   end`);
-  await page.getByRole("button", { name: "\u5e94\u7528\u4e3a\u65b0\u56fe" }).click();
+  await page.getByRole("button", { name: "应用为新图" }).click();
 
-  await expect(page.getByLabel("\u56fe\u540d\u79f0")).toHaveValue("AI Flow");
+  await expect(page.getByLabel("图名称")).toHaveValue("AI Flow");
   await expect(page.locator(".outline-relations button")).toHaveCount(2);
   await expect(page.getByRole("button", { name: "Input" })).toBeVisible();
 });
 
-
 test("applies SVG source and reports sanitization diagnostics", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "\u5e94\u7528 SVG" }).click();
+  await page.getByRole("button", { name: "应用 SVG" }).click();
 
-  await page.getByRole("textbox", { name: "SVG \u6e90\u7801" }).fill(`
+  await page.getByRole("textbox", { name: "SVG 源码" }).fill(`
     <svg viewBox="0 0 320 160" onload="alert(1)">
       <script>alert(1)</script>
       <rect x="20" y="20" width="180" height="70" fill="#cde8db" />
       <a href="https://example.com"><text x="30" y="65">AI SVG</text></a>
     </svg>
   `);
-  await page.getByRole("button", { name: "\u5e94\u7528\u4e3a\u65b0\u56fe" }).click();
+  await page.getByRole("button", { name: "应用为新图" }).click();
 
-  await expect(page.getByLabel("\u56fe\u540d\u79f0")).toHaveValue(
-    "AI SVG \u6e90\u7801",
-  );
-  await page.getByRole("button", { name: "AI SVG \u6e90\u7801" }).click();
-  await expect(page.getByText("\u6e90\u7801\u8bca\u65ad", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("图名称")).toHaveValue("AI SVG 源码");
+  await page.getByRole("button", { name: "AI SVG 源码" }).click();
+  await expect(page.getByText("源码诊断", { exact: true })).toBeVisible();
+});
+
+test("imports a structured SVG with markers as editable relations", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("select.svg-import-mode").selectOption("structured");
+  await page.locator(`input[accept="image/svg+xml,.svg"]`).setInputFiles({
+    name: "complex-diagram.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from(`
+      <svg viewBox="0 0 500 220" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="arrow" markerWidth="8" markerHeight="8"><path d="M0,0 L8,4 L0,8 z" /></marker></defs>
+        <g transform="translate(20 15)">
+          <rect id="source" x="10" y="30" width="130" height="64" rx="8" fill="#dbeafe" stroke="#2563eb" />
+          <rect id="target" x="300" y="30" width="130" height="64" rx="8" fill="#dcfce7" stroke="#16a34a" />
+          <path id="flow-arrow" d="M140 62 C190 62, 250 62, 300 62" stroke="#475569" fill="none" marker-end="url(#arrow)" />
+          <text x="48" y="68">Source</text><text x="338" y="68">Target</text>
+        </g>
+      </svg>
+    `),
+  });
+
+  await expect(page.getByLabel("图名称")).toHaveValue("complex-diagram");
+  await expect(page.locator(".outline-node")).toHaveCount(2);
+  await expect(page.locator(".outline-relations button")).toHaveCount(1);
+});
+
+test("imports DiagramC JSON and previews then reapplies AI commands", async ({ page }) => {
+  await page.route("**/api/ai/commands", async (route) => {
+    const request = route.request().postDataJSON() as { document: Record<string, unknown> };
+    const candidate = structuredClone(request.document) as {
+      document: { revision: number };
+      elements: unknown[];
+    };
+    candidate.elements = [
+      {
+        id: "ai-review",
+        kind: "node",
+        semanticType: "flow.step",
+        data: { label: "AI Review", shape: "rounded" },
+        ports: [],
+      },
+    ];
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        summary: "Add AI review",
+        operations: [{ op: "element.create", element: candidate.elements[0] }],
+        transaction: {
+          transactionId: "e2e-ai",
+          baseRevision: candidate.document.revision,
+          actor: "ai",
+          summary: "Add AI review",
+          operations: [{ op: "element.create", element: candidate.elements[0] }],
+        },
+        document: candidate,
+      }),
+    });
+  });
+  await page.route("**/api/commands/replay", async (route) => {
+    const request = route.request().postDataJSON() as { document: unknown };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        operations: [],
+        transaction: { transactionId: "e2e-replay", baseRevision: 0, actor: "ai", operations: [] },
+        document: request.document,
+      }),
+    });
+  });
+  await page.goto("/");
+  await page.locator(`input[accept="application/json,.json"]`).setInputFiles({
+    name: "imported.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        schemaVersion: "2.0",
+        document: { id: "e2e-import", title: "Imported E2E", diagramType: "flow", revision: 0 },
+        elements: [], relations: [], constraints: [], layouts: {}, presentation: {}, assets: {}, extensions: {}, metadata: {},
+      }),
+    ),
+  });
+  await expect(page.getByLabel("图名称")).toHaveValue("Imported E2E");
+
+  await page.getByRole("button", { name: /AI/ }).click();
+  await page.getByLabel("修改意图").fill("add a review step");
+  await page.getByRole("button", { name: "生成命令预览" }).click();
+  await expect(page.locator(".proposal-card strong")).toHaveText("Add AI review");
+  await page.getByRole("button", { name: "应用事务" }).click();
+  await expect(page.locator(".outline-node", { hasText: "AI Review" })).toBeVisible();
+  await page.getByRole("button", { name: "重新应用" }).click();
+  await expect(page.locator(".ai-status", { hasText: "已重新应用：Add AI review" })).toBeVisible();
 });

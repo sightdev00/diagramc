@@ -25,6 +25,7 @@ apps/web/node_modules/
 apps/web/dist/
 playwright-report/
 test-results/
+e2e-coverage/
 blob-report/
 *.tsbuildinfo
 *.log

@@ -9,8 +9,8 @@
 - [x] SVG fidelity/structured import and editable fidelity-SVG source.
 - [x] Local and protected LAN Studio serving.
 - [x] GitHub release workflow and Docker image definition (publishes on matching `v*` tags).
-- [x] Browser E2E smoke suite for core Studio editing and export.
-- [ ] Public demo gallery and browser coverage reporting.
+- [x] Browser E2E coverage for Studio editing, import/export, complex SVG and AI preview/reapply (V8 evidence uploaded by CI).
+- [ ] Public demo gallery.
 
 ## v0.2.0 — AI source workflow
 
@@ -21,9 +21,9 @@
 
 ## v0.3.0 — Reliability and collaboration
 
-- [ ] Token rotation and session revocation.
-- [ ] Provider endpoint policy, rate limiting and audit-friendly security controls.
-- [ ] Version conflict handling for shared Studio state.
+- [x] Token rotation for automatically managed LAN tokens and session replacement.
+- [x] Provider endpoint policy, rate limiting and audit-friendly security controls.
+- [x] Version conflict handling for shared Studio state.
 - [ ] Accessibility pass and bilingual product documentation.
 - [ ] Code splitting and large-diagram performance work.
 

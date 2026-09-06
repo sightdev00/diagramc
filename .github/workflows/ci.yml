@@ -66,12 +66,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir apps/web exec playwright install --with-deps chromium
       - run: pnpm e2e
-      - name: Upload Playwright report
-        if: ${{ failure() }}
+      - name: Upload Playwright evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: apps/web/playwright-report/
+          name: playwright-evidence
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+            apps/web/e2e-coverage/
           if-no-files-found: ignore
 
 
