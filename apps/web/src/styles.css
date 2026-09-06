@@ -322,6 +322,50 @@ button.primary {
   color: #365b4f;
   font-variant-numeric: tabular-nums;
 }
+.arrange-control {
+  position: relative;
+}
+.arrange-control > button {
+  min-height: 31px;
+  font-size: 12px;
+  background: #f8f7f3;
+}
+.arrange-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 7px);
+  left: 0;
+  width: 238px;
+  padding: 10px;
+  background: #fbfaf6;
+  border: 1px solid #c8c4b9;
+  border-radius: 8px;
+  box-shadow: 0 12px 26px rgb(42 42 36 / 18%);
+}
+.arrange-menu-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.arrange-menu-heading small,
+.arrange-menu > small {
+  color: #77746c;
+  font-size: 11px;
+}
+.arrange-menu-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.arrange-menu-actions button {
+  min-height: 30px;
+  padding: 4px 7px;
+  background: #f2f0e9;
+  font-size: 12px;
+}
+
 .toolbar-status {
   margin-left: auto;
   overflow: hidden;

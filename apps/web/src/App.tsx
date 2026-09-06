@@ -1,4 +1,4 @@
-import { Graph, Selection } from "@antv/x6";
+import { Graph, Selection, Snapline, Transform } from "@antv/x6";
 import {
   ChangeEvent,
   useCallback,
@@ -115,6 +115,15 @@ const ELEMENT_TEMPLATES = [
   },
 ] as const;
 type ElementTemplateId = (typeof ELEMENT_TEMPLATES)[number]["id"];
+type AlignmentCommand =
+  | "left"
+  | "center"
+  | "right"
+  | "top"
+  | "middle"
+  | "bottom"
+  | "horizontal"
+  | "vertical";
 
 interface DiagramClipboard {
   elements: DiagramElement[];
@@ -156,6 +165,18 @@ function createBlankDocument(): DiagramDocument {
 
 function clone<T>(value: T): T {
   return structuredClone(value);
+}
+
+function ensureDefaultLayout(draft: DiagramDocument) {
+  if (!draft.layouts.default) {
+    draft.layouts.default = {
+      engine: "elk",
+      profile: "layered",
+      options: {},
+      overrides: {},
+    };
+  }
+  return draft.layouts.default;
 }
 
 function applyElementPatch(
@@ -354,6 +375,7 @@ export function App() {
     SourceImportKind | undefined
   >();
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false);
+  const [arrangeOptionsOpen, setArrangeOptionsOpen] = useState(false);
   const [exportNameDraft, setExportNameDraft] = useState("");
   const [exportBackground, setExportBackground] = useState(true);
   const [pngScale, setPngScale] = useState<1 | 2 | 3>(2);
@@ -368,6 +390,9 @@ export function App() {
     const ids = new Set(selectedIds);
     return document?.elements.filter((element) => ids.has(element.id)) ?? [];
   }, [document, selectedIds]);
+  const selectedNodeCount = selectedElements.filter(
+    (element) => element.kind !== "group",
+  ).length;
   const selectedRelation = useMemo(
     () => document?.relations.find((relation) => relation.id === selectedId),
     [document, selectedId],
@@ -777,6 +802,22 @@ export function App() {
     [commit],
   );
 
+  const persistElementPositions = useCallback(
+    (positions: Map<string, { x: number; y: number }>, message: string) => {
+      if (!positions.size) return;
+      commit((draft) => {
+        const layout = ensureDefaultLayout(draft);
+        for (const [id, position] of positions) {
+          const element = draft.elements.find((item) => item.id === id);
+          if (!element || element.kind === "group") continue;
+          const current = layout.overrides[id] ?? {};
+          layout.overrides[id] = { ...current, pinned: true, position };
+        }
+      }, message);
+    },
+    [commit],
+  );
+
   const moveElement = useCallback(
     (elementId: string, position: { x: number; y: number }) => {
       pendingMovesRef.current.set(elementId, {
@@ -816,6 +857,27 @@ export function App() {
             : `已固定 ${moves[0][0]} 的位置`,
         );
       }, 180);
+    },
+    [commit],
+  );
+
+  const resizeElement = useCallback(
+    (elementId: string, size: { width: number; height: number }) => {
+      const width = Math.max(80, Math.round(size.width));
+      const height = Math.max(40, Math.round(size.height));
+      commit(
+        (draft) => {
+          const element = draft.elements.find((item) => item.id === elementId);
+          if (!element || element.kind === "group") return;
+          const layout = ensureDefaultLayout(draft);
+          const current = layout.overrides[elementId] ?? {};
+          layout.overrides[elementId] = {
+            ...current,
+            size: { width, height },
+          };
+        },
+        "已调整 " + elementId + " 的尺寸",
+      );
     },
     [commit],
   );
@@ -907,6 +969,29 @@ export function App() {
         following: true,
       }),
     );
+    graph.use(
+      new Snapline({
+        enabled: true,
+        sharp: true,
+        tolerance: 8,
+        resizing: true,
+        clean: true,
+        filter: (node) =>
+          node.getData<{ elementKind?: string }>()?.elementKind !== "group",
+      }),
+    );
+    graph.use(
+      new Transform({
+        resizing: {
+          enabled: (node) =>
+            node.getData<{ elementKind?: string }>()?.elementKind !== "group",
+          minWidth: 80,
+          minHeight: 40,
+          restrict: true,
+        },
+        rotating: false,
+      }),
+    );
     graphRef.current = graph;
     graph.on("scale", syncZoomPercent);
     const onEditorKeyDown = (event: KeyboardEvent) => {
@@ -947,6 +1032,7 @@ export function App() {
       handleSelect,
       connectElements,
       moveElement,
+      resizeElement,
       updateCanvasLabel,
       () => token === renderTokenRef.current,
     )
@@ -968,6 +1054,7 @@ export function App() {
     handleSelect,
     connectElements,
     moveElement,
+    resizeElement,
     updateCanvasLabel,
     fitCanvas,
     syncGraphSelection,
@@ -1103,6 +1190,121 @@ export function App() {
     }
   };
 
+  const selectedNodePlacements = () => {
+    const graph = graphRef.current;
+    if (!graph) return [];
+    const placements: Array<{
+      id: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }> = [];
+    for (const element of selectedElements) {
+      if (element.kind === "group") continue;
+      const cell = graph.getCellById(element.id);
+      if (!cell?.isNode()) continue;
+      const position = cell.getPosition();
+      const size = cell.getSize();
+      placements.push({ id: element.id, ...position, ...size });
+    }
+    return placements;
+  };
+
+  const arrangeSelected = (command: AlignmentCommand) => {
+    const placements = selectedNodePlacements();
+    const isDistribution = command === "horizontal" || command === "vertical";
+    const minimum = isDistribution ? 3 : 2;
+    if (placements.length < minimum) {
+      setStatus(
+        isDistribution
+          ? "等距分布需要至少选择 3 个框"
+          : "对齐需要至少选择 2 个框",
+      );
+      return;
+    }
+    const next = new Map(
+      placements.map(({ id, x, y }) => [
+        id,
+        { x: Math.round(x), y: Math.round(y) },
+      ]),
+    );
+    const minX = Math.min(...placements.map((item) => item.x));
+    const maxX = Math.max(...placements.map((item) => item.x + item.width));
+    const minY = Math.min(...placements.map((item) => item.y));
+    const maxY = Math.max(...placements.map((item) => item.y + item.height));
+    if (command === "left" || command === "center" || command === "right") {
+      for (const item of placements) {
+        const x =
+          command === "left"
+            ? minX
+            : command === "center"
+              ? (minX + maxX - item.width) / 2
+              : maxX - item.width;
+        next.set(item.id, { x: Math.round(x), y: Math.round(item.y) });
+      }
+    }
+    if (command === "top" || command === "middle" || command === "bottom") {
+      for (const item of placements) {
+        const y =
+          command === "top"
+            ? minY
+            : command === "middle"
+              ? (minY + maxY - item.height) / 2
+              : maxY - item.height;
+        next.set(item.id, { x: Math.round(item.x), y: Math.round(y) });
+      }
+    }
+    if (command === "horizontal") {
+      const ordered = [...placements].sort((left, right) => left.x - right.x);
+      const totalWidth = ordered.reduce((sum, item) => sum + item.width, 0);
+      const gap = (maxX - minX - totalWidth) / (ordered.length - 1);
+      let x = minX;
+      for (const item of ordered) {
+        next.set(item.id, { x: Math.round(x), y: Math.round(item.y) });
+        x += item.width + gap;
+      }
+    }
+    if (command === "vertical") {
+      const ordered = [...placements].sort((top, bottom) => top.y - bottom.y);
+      const totalHeight = ordered.reduce((sum, item) => sum + item.height, 0);
+      const gap = (maxY - minY - totalHeight) / (ordered.length - 1);
+      let y = minY;
+      for (const item of ordered) {
+        next.set(item.id, { x: Math.round(item.x), y: Math.round(y) });
+        y += item.height + gap;
+      }
+    }
+    const labels: Record<AlignmentCommand, string> = {
+      left: "左对齐",
+      center: "水平居中",
+      right: "右对齐",
+      top: "顶部对齐",
+      middle: "垂直居中",
+      bottom: "底部对齐",
+      horizontal: "水平等距分布",
+      vertical: "垂直等距分布",
+    };
+    persistElementPositions(
+      next,
+      "已对 " + placements.length + " 个框" + labels[command],
+    );
+  };
+
+  const nudgeSelected = (x: number, y: number) => {
+    const positions = new Map(
+      selectedNodePlacements().map((item) => [
+        item.id,
+        { x: Math.round(item.x + x), y: Math.round(item.y + y) },
+      ]),
+    );
+    if (!positions.size) return;
+    persistElementPositions(
+      positions,
+      "已微调 " + positions.size + " 个框的位置",
+    );
+  };
+
   const setAllRelationFontSize = (value: string) => {
     const fontSize = Number(value);
     if (!Number.isFinite(fontSize) || fontSize < 8 || fontSize > 72) {
@@ -1208,6 +1410,26 @@ export function App() {
         return;
       }
       if (
+        selectedIds.length &&
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+      ) {
+        event.preventDefault();
+        const step = event.shiftKey ? 10 : 1;
+        nudgeSelected(
+          event.key === "ArrowLeft"
+            ? -step
+            : event.key === "ArrowRight"
+              ? step
+              : 0,
+          event.key === "ArrowUp"
+            ? -step
+            : event.key === "ArrowDown"
+              ? step
+              : 0,
+        );
+        return;
+      }
+      if (
         (event.key === "Delete" || event.key === "Backspace") &&
         selectedIds.length
       ) {
@@ -1217,7 +1439,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [document, selectedIds, zoomCanvas, resetZoom]);
+  }, [document, selectedIds, zoomCanvas, resetZoom, nudgeSelected]);
 
   const changeDirection = (next: LayoutDirection) => {
     commit(
@@ -2198,6 +2420,93 @@ export function App() {
           <button disabled={!redoRef.current.length} onClick={redo}>
             ↷ 重做
           </button>
+        </div>
+        <div className="arrange-control">
+          <button
+            aria-controls="arrange-options"
+            aria-expanded={arrangeOptionsOpen}
+            disabled={selectedNodeCount < 2}
+            onClick={() => setArrangeOptionsOpen((open) => !open)}
+          >
+            排列 ▾
+          </button>
+          {arrangeOptionsOpen && (
+            <div className="arrange-menu" id="arrange-options">
+              <div className="arrange-menu-heading">
+                <strong>排列</strong>
+                <small>已选 {selectedNodeCount} 个框</small>
+              </div>
+              <div className="arrange-menu-actions">
+                <button
+                  onClick={() => {
+                    arrangeSelected("left");
+                    setArrangeOptionsOpen(false);
+                  }}
+                >
+                  左对齐
+                </button>
+                <button
+                  onClick={() => {
+                    arrangeSelected("center");
+                    setArrangeOptionsOpen(false);
+                  }}
+                >
+                  水平居中
+                </button>
+                <button
+                  onClick={() => {
+                    arrangeSelected("right");
+                    setArrangeOptionsOpen(false);
+                  }}
+                >
+                  右对齐
+                </button>
+                <button
+                  onClick={() => {
+                    arrangeSelected("top");
+                    setArrangeOptionsOpen(false);
+                  }}
+                >
+                  顶部对齐
+                </button>
+                <button
+                  onClick={() => {
+                    arrangeSelected("middle");
+                    setArrangeOptionsOpen(false);
+                  }}
+                >
+                  垂直居中
+                </button>
+                <button
+                  onClick={() => {
+                    arrangeSelected("bottom");
+                    setArrangeOptionsOpen(false);
+                  }}
+                >
+                  底部对齐
+                </button>
+                <button
+                  disabled={selectedNodeCount < 3}
+                  onClick={() => {
+                    arrangeSelected("horizontal");
+                    setArrangeOptionsOpen(false);
+                  }}
+                >
+                  水平等距
+                </button>
+                <button
+                  disabled={selectedNodeCount < 3}
+                  onClick={() => {
+                    arrangeSelected("vertical");
+                    setArrangeOptionsOpen(false);
+                  }}
+                >
+                  垂直等距
+                </button>
+              </div>
+              <small>方向键微调 1px；Shift + 方向键微调 10px。</small>
+            </div>
+          )}
         </div>
         <div className="tool-group layout-switch">
           <span>自动布局</span>

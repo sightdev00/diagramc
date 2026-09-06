@@ -31,6 +31,23 @@ type LayoutResult = {
 
 let lastLayout: { signature: string; result: LayoutResult } | undefined;
 
+type InteractionHandlers = {
+  nodeClick: (args: {
+    node: Node;
+    e: { ctrlKey?: boolean; metaKey?: boolean };
+  }) => void;
+  edgeClick: (args: {
+    edge: Edge;
+    e: { ctrlKey?: boolean; metaKey?: boolean };
+  }) => void;
+  edgeConnected: (args: { edge: Edge; isNew: boolean }) => void;
+  nodeMove: (args: { node: Node }) => void;
+  nodeResized: (args: { node: Node }) => void;
+  blankClick: () => void;
+};
+
+const interactionHandlers = new WeakMap<Graph, InteractionHandlers>();
+
 function layoutSignature(
   document: DiagramDocument,
   direction: LayoutDirection,
@@ -499,6 +516,9 @@ export async function renderDocument(
   onMove:
     | ((elementId: string, position: { x: number; y: number }) => void)
     | undefined,
+  onResize:
+    | ((elementId: string, size: { width: number; height: number }) => void)
+    | undefined,
   onLabelChange:
     | ((id: string, label: string, type: "element" | "relation") => void)
     | undefined,
@@ -942,37 +962,59 @@ export async function renderDocument(
   if (shouldRender && !shouldRender()) return;
   reconcileCells(graph, cells, document);
 
-  graph.off("node:click");
-  graph.off("edge:click");
-  graph.off("edge:connected");
-  graph.off("node:move");
-  graph.off("node:moved");
-  graph.off("blank:click");
-  graph.on("node:click", ({ node, e }) => {
-    const id = node.getData<{ elementId?: string }>()?.elementId;
-    if (id) onSelect(id, e.ctrlKey || e.metaKey);
-  });
-  graph.on("edge:click", ({ edge, e }) =>
-    onSelect(edge.id, e.ctrlKey || e.metaKey),
-  );
-  graph.on("edge:connected", ({ edge, isNew }) => {
-    const sourceId = edge.getSourceCellId();
-    const targetId = edge.getTargetCellId();
-    if (sourceId && targetId && sourceId !== targetId) {
-      onConnect?.(
-        edge.id,
-        { elementId: sourceId, portId: edge.getSourcePortId() ?? undefined },
-        { elementId: targetId, portId: edge.getTargetPortId() ?? undefined },
-        isNew,
-      );
-    }
-  });
-  graph.on("node:move", ({ node }) => {
-    for (const edge of graph.getConnectedEdges(node)) {
-      edge.setVertices([]);
-      edge.setRouter({ name: "manhattan", args: { padding: 18 } });
-    }
-  });
+  const previousHandlers = interactionHandlers.get(graph);
+  if (previousHandlers) {
+    graph.off("node:click", previousHandlers.nodeClick);
+    graph.off("edge:click", previousHandlers.edgeClick);
+    graph.off("edge:connected", previousHandlers.edgeConnected);
+    graph.off("node:move", previousHandlers.nodeMove);
+    graph.off("node:resized", previousHandlers.nodeResized);
+    graph.off("blank:click", previousHandlers.blankClick);
+  }
+  const handlers: InteractionHandlers = {
+    nodeClick: ({ node, e }) => {
+      const id = node.getData<{ elementId?: string }>()?.elementId;
+      if (id) onSelect(id, Boolean(e.ctrlKey || e.metaKey));
+    },
+    edgeClick: ({ edge, e }) =>
+      onSelect(edge.id, Boolean(e.ctrlKey || e.metaKey)),
+    edgeConnected: ({ edge, isNew }) => {
+      const sourceId = edge.getSourceCellId();
+      const targetId = edge.getTargetCellId();
+      if (sourceId && targetId && sourceId !== targetId) {
+        onConnect?.(
+          edge.id,
+          { elementId: sourceId, portId: edge.getSourcePortId() ?? undefined },
+          { elementId: targetId, portId: edge.getTargetPortId() ?? undefined },
+          isNew,
+        );
+      }
+    },
+    nodeMove: ({ node }) => {
+      for (const edge of graph.getConnectedEdges(node)) {
+        edge.setVertices([]);
+        edge.setRouter({ name: "manhattan", args: { padding: 18 } });
+      }
+    },
+    nodeResized: ({ node }) => {
+      const id = node.getData<{
+        elementId?: string;
+        elementKind?: string;
+      }>()?.elementId;
+      if (
+        id &&
+        node.getData<{ elementKind?: string }>()?.elementKind !== "group"
+      )
+        onResize?.(id, node.getSize());
+    },
+    blankClick: () => onSelect(undefined),
+  };
+  graph.on("node:click", handlers.nodeClick);
+  graph.on("edge:click", handlers.edgeClick);
+  graph.on("edge:connected", handlers.edgeConnected);
+  graph.on("node:move", handlers.nodeMove);
+  graph.on("node:resized", handlers.nodeResized);
+  graph.on("blank:click", handlers.blankClick);
   graph.model.collection.on(
     "node:change:position",
     ({ node, options }) => {
@@ -982,11 +1024,10 @@ export async function renderDocument(
       if (
         id &&
         node.getData<{ elementKind?: string }>()?.elementKind !== "group"
-      ) {
+      )
         onMove?.(id, node.getPosition());
-      }
     },
     renderDocument,
   );
-  graph.on("blank:click", () => onSelect(undefined));
+  interactionHandlers.set(graph, handlers);
 }

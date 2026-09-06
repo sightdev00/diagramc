@@ -68,6 +68,44 @@ test("creates, renames, edits, and exports a diagram", async ({ page }) => {
   expect(pngDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.png/);
 });
 
+test("aligns selected nodes and supports keyboard nudging", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("select.element-picker").selectOption("process");
+  for (let index = 0; index < 3; index += 1)
+    await page.getByRole("button", { name: "＋ 添加" }).click();
+
+  await expect(page.locator(".x6-node")).toHaveCount(3);
+  await page.getByRole("button", { name: "全选" }).click();
+  const arrange = page.getByRole("button", { name: "排列 ▾" });
+  await expect(arrange).toBeEnabled();
+  await arrange.click();
+  await page.getByRole("button", { name: "左对齐" }).click();
+  await expect(page.locator(".toolbar-status")).toContainText("已对 3 个框左对齐");
+
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".toolbar-status")).toContainText("已微调 3 个框的位置");
+});
+
+test("shows resize handles for a selected node", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "＋ 添加" }).click();
+  const node = page.locator(".x6-node").first();
+  await expect(node).toBeVisible();
+  await node.click();
+  await expect(page.locator(".x6-widget-transform-resize")).toHaveCount(8);
+  const rightHandle = page.locator(
+    ".x6-widget-transform-resize[data-position=right]",
+  );
+  const box = await rightHandle.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) return;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 48, box.y + box.height / 2);
+  await page.mouse.up();
+  await expect.poll(async () => Number(await page.getByRole("spinbutton", { name: "宽度" }).inputValue())).toBeGreaterThan(220);
+});
+
 test("imports an editable Mermaid flowchart source", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "应用 Mermaid" }).click();
