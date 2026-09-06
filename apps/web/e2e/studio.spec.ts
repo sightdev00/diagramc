@@ -184,7 +184,7 @@ test("imports DiagramC JSON and previews then reapplies AI commands", async ({ p
   });
   await expect(page.getByLabel("图名称")).toHaveValue("Imported E2E");
 
-  await page.getByRole("button", { name: /AI/ }).click();
+  await page.getByRole("tab", { name: /AI/ }).click();
   await page.getByLabel("修改意图").fill("add a review step");
   await page.getByRole("button", { name: "生成命令预览" }).click();
   await expect(page.locator(".proposal-card strong")).toHaveText("Add AI review");
