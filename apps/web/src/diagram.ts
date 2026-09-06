@@ -1,14 +1,72 @@
 import { Cell, Edge, Graph, Node } from "@antv/x6";
-import ELK, { ElkNode } from "elkjs/lib/elk.bundled.js";
+import type { ElkNode } from "elkjs/lib/elk.bundled.js";
 
 import { canvasTheme, type CanvasTheme } from "./canvasThemes";
 import type { DiagramDocument, DiagramElement, LayoutDirection } from "./types";
 
-const elk = new ELK();
+let elkPromise: ReturnType<typeof createLayoutEngine> | undefined;
+
+async function createLayoutEngine() {
+  const { default: ELK } = await import("elkjs/lib/elk.bundled.js");
+  return new ELK();
+}
+
+function layoutEngine() {
+  elkPromise ??= createLayoutEngine();
+  return elkPromise;
+}
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 76;
 const GROUP_PADDING = 28;
 const GROUP_HEADER = 42;
+
+type LayoutResult = {
+  positions: Map<string, { x: number; y: number }>;
+  edgeVertices: Map<string, Array<{ x: number; y: number }>>;
+  groupFrames: Map<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >;
+};
+
+let lastLayout: { signature: string; result: LayoutResult } | undefined;
+
+function layoutSignature(
+  document: DiagramDocument,
+  direction: LayoutDirection,
+) {
+  const overrides = document.layouts.default?.overrides ?? {};
+  return JSON.stringify({
+    direction,
+    elements: document.elements.map((element) => ({
+      id: element.id,
+      kind: element.kind,
+      parentId: element.parentId,
+      shape: element.data.shape,
+      size: overrides[element.id]?.size,
+    })),
+    relations: document.relations.map((relation) => ({
+      id: relation.id,
+      source: relation.source.elementId,
+      target: relation.target.elementId,
+    })),
+  });
+}
+
+function cloneLayout(result: LayoutResult): LayoutResult {
+  return {
+    positions: new Map(result.positions),
+    edgeVertices: new Map(
+      [...result.edgeVertices].map(([id, points]) => [
+        id,
+        points.map((point) => ({ ...point })),
+      ]),
+    ),
+    groupFrames: new Map(
+      [...result.groupFrames].map(([id, frame]) => [id, { ...frame }]),
+    ),
+  };
+}
 
 function dataString(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value : fallback;
@@ -138,7 +196,10 @@ function nodeSize(document: DiagramDocument, elementId: string) {
 export async function computeLayout(
   document: DiagramDocument,
   direction: LayoutDirection,
-) {
+): Promise<LayoutResult> {
+  const signature = layoutSignature(document, direction);
+  if (lastLayout?.signature === signature)
+    return cloneLayout(lastLayout.result);
   const nodes = document.elements.filter((element) => element.kind !== "group");
   const groups = document.elements.filter(
     (element) => element.kind === "group",
@@ -211,7 +272,7 @@ export async function computeLayout(
       })),
   };
 
-  const result = await elk.layout(layoutGraph);
+  const layoutResult = await (await layoutEngine()).layout(layoutGraph);
   const positions = new Map<string, { x: number; y: number }>();
   const groupFrames = new Map<
     string,
@@ -233,15 +294,17 @@ export async function computeLayout(
       collect(child, x, y);
     }
   };
-  collect(result);
+  collect(layoutResult);
   const edgeVertices = new Map<string, Array<{ x: number; y: number }>>();
-  for (const edge of result.edges ?? []) {
+  for (const edge of layoutResult.edges ?? []) {
     const vertices = (edge.sections ?? []).flatMap((section) =>
       (section.bendPoints ?? []).map((point) => ({ x: point.x, y: point.y })),
     );
     if (vertices.length) edgeVertices.set(edge.id, vertices);
   }
-  return { positions, edgeVertices, groupFrames };
+  const result = { positions, edgeVertices, groupFrames };
+  lastLayout = { signature, result };
+  return cloneLayout(result);
 }
 
 function groupBounds(
