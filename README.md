@@ -1,5 +1,7 @@
 # DiagramC
 
+[English](README.md) · [简体中文](docs/README.zh-CN.md)
+
 DiagramC is an AI-assisted, local-first diagram compiler and visual editor for engineering teams.
 
 它将可验证的结构化图数据、AI 命令预览和可编辑画布结合在一起，用于架构图、流程图、系统关系图与技术方案图。
@@ -114,6 +116,7 @@ pnpm e2e           # Chromium Studio smoke test
 
 ## Documentation
 
+- [中文产品说明](docs/README.zh-CN.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Code map](docs/CODEMAP.md)
 - [Studio implementation](docs/M0_IMPLEMENTATION.md)

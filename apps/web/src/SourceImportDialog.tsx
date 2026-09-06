@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type SourceImportKind = "mermaid" | "svg";
 
@@ -32,6 +32,10 @@ export function SourceImportDialog({
 }) {
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
+  const sourceRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    sourceRef.current?.focus();
+  }, []);
   const copy = COPY[kind];
   const apply = () => {
     if (!source.trim()) {
@@ -53,6 +57,12 @@ export function SourceImportDialog({
         aria-modal="true"
         className="source-import-dialog"
         role="dialog"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onClose();
+          }
+        }}
       >
         <div className="source-import-heading">
           <div>
@@ -70,7 +80,7 @@ export function SourceImportDialog({
         <label>
           {copy.label}
           <textarea
-            autoFocus
+            ref={sourceRef}
             placeholder={copy.placeholder}
             rows={16}
             value={source}
@@ -86,7 +96,11 @@ export function SourceImportDialog({
             }}
           />
         </label>
-        {error && <div className="source-import-error">{error}</div>}
+        {error && (
+          <div className="source-import-error" role="alert">
+            {error}
+          </div>
+        )}
         <div className="source-import-actions">
           <small>{"Ctrl/Cmd + Enter \u53ef\u76f4\u63a5\u5e94\u7528"}</small>
           <button className="primary" onClick={apply}>

@@ -307,6 +307,7 @@ export function App() {
   const sharedWorkspaceTimerRef = useRef<number | undefined>(undefined);
   const sharedHistoryTimerRef = useRef<number | undefined>(undefined);
   const sharedSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const sourceImportTriggerRef = useRef<HTMLElement | null>(null);
   const deletedDocumentIdsRef = useRef(new Set<string>());
 
   const [document, setDocument] = useState<DiagramDocument | undefined>(
@@ -399,6 +400,16 @@ export function App() {
     });
     if (id) setRightTab("inspect");
   }, []);
+
+  const openSourceImport = (kind: SourceImportKind, trigger: HTMLElement) => {
+    sourceImportTriggerRef.current = trigger;
+    setSourceImportKind(kind);
+  };
+
+  const closeSourceImport = () => {
+    setSourceImportKind(undefined);
+    window.requestAnimationFrame(() => sourceImportTriggerRef.current?.focus());
+  };
 
   const syncZoomPercent = useCallback(() => {
     const graph = graphRef.current;
@@ -1963,6 +1974,7 @@ export function App() {
         </div>
         <div className="top-actions">
           <select
+            aria-label="切换图纸"
             className="diagram-switcher"
             value={document?.document.id ?? ""}
             onChange={(event) => switchDocument(event.target.value)}
@@ -1981,6 +1993,7 @@ export function App() {
             导入 JSON
           </button>
           <select
+            aria-label="SVG 导入模式"
             className="svg-import-mode"
             value={svgImportMode}
             onChange={(event) =>
@@ -1999,11 +2012,16 @@ export function App() {
           </button>
           <button
             className="quiet"
-            onClick={() => setSourceImportKind("mermaid")}
+            onClick={(event) =>
+              openSourceImport("mermaid", event.currentTarget)
+            }
           >
             {"\u5e94\u7528 Mermaid"}
           </button>
-          <button className="quiet" onClick={() => setSourceImportKind("svg")}>
+          <button
+            className="quiet"
+            onClick={(event) => openSourceImport("svg", event.currentTarget)}
+          >
             {"\u5e94\u7528 SVG"}
           </button>
           <button className="quiet" onClick={newBlankDocument}>
@@ -2042,13 +2060,15 @@ export function App() {
           <div className="export-control">
             <button
               className="quiet"
+              aria-controls="export-options"
+              aria-expanded={exportOptionsOpen}
               disabled={!document}
               onClick={() => setExportOptionsOpen((open) => !open)}
             >
               导出设置 ▾
             </button>
             {exportOptionsOpen && (
-              <div className="export-menu">
+              <div className="export-menu" id="export-options">
                 <div className="export-menu-heading">
                   <strong>导出设置</strong>
                   <button
@@ -2141,7 +2161,7 @@ export function App() {
           onApply={
             sourceImportKind === "svg" ? applySvgSource : applyMermaidSource
           }
-          onClose={() => setSourceImportKind(undefined)}
+          onClose={closeSourceImport}
         />
       )}
 
@@ -2340,14 +2360,18 @@ export function App() {
         </section>
 
         <aside className="right-panel">
-          <div className="tabs">
+          <div className="tabs" role="tablist" aria-label="工作区面板">
             <button
+              role="tab"
+              aria-selected={rightTab === "inspect"}
               className={rightTab === "inspect" ? "active" : ""}
               onClick={() => setRightTab("inspect")}
             >
               属性
             </button>
             <button
+              role="tab"
+              aria-selected={rightTab === "ai"}
               className={rightTab === "ai" ? "active" : ""}
               onClick={() => setRightTab("ai")}
             >

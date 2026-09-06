@@ -193,3 +193,15 @@ test("imports DiagramC JSON and previews then reapplies AI commands", async ({ p
   await page.getByRole("button", { name: "重新应用" }).click();
   await expect(page.locator(".ai-status", { hasText: "已重新应用：Add AI review" })).toBeVisible();
 });
+
+
+test("supports keyboard dismissal and focus restoration for source import", async ({ page }) => {
+  await page.goto("/");
+  const trigger = page.getByRole("button", { name: "应用 Mermaid" });
+  await trigger.click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Mermaid 源码" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(trigger).toBeFocused();
+});

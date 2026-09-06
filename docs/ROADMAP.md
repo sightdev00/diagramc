@@ -24,7 +24,7 @@
 - [x] Token rotation for automatically managed LAN tokens and session replacement.
 - [x] Provider endpoint policy, rate limiting and audit-friendly security controls.
 - [x] Version conflict handling for shared Studio state.
-- [ ] Accessibility pass and bilingual product documentation.
+- [x] Accessibility pass and bilingual product documentation.
 - [x] Code splitting and structural layout caching for large diagrams.
 
 ## Future layout and integration work
