@@ -66,6 +66,10 @@ For a non-loopback listener, DiagramC automatically creates or reuses an access 
 
 The token is an access-control mechanism, not TLS. For untrusted networks, place DiagramC behind HTTPS, a VPN, or an authenticated reverse proxy.
 
+Managed LAN tokens can be rotated without restarting the server: send an authenticated `POST` request to `/api/security/access-token/rotate`. Rotation is deliberately unavailable when you supplied `--token`; replace an explicit token through your own secret-management process.
+
+The Provider Gateway accepts loopback providers and `https://api.openai.com` by default. Add an explicitly trusted provider host with `--provider-allowlist localhost,127.0.0.1,api.openai.com,models.example.com`; AI calls are limited to 12 requests per client per minute by default (`--ai-rate-limit`).
+
 ### Docker
 
 The container serves Studio on port `8765`. Both Studio state and the automatic LAN token are kept in the `/data` volume.

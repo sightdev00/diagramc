@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+from collections import deque
 import ipaddress
 import json
 import os
@@ -10,11 +11,12 @@ import re
 import ssl
 import socket
 import threading
+import time
 import urllib.error
 import urllib.request
 
 import yaml
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -96,6 +98,89 @@ class GatewayResponse:
     diagnostics: list[dict[str, Any]]
 
 
+DEFAULT_PROVIDER_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "api.openai.com"})
+
+
+class RevisionConflict(ValueError):
+    def __init__(self, expected: int, actual: int) -> None:
+        super().__init__(
+            f"shared Studio state changed (expected revision {expected}, current {actual})"
+        )
+        self.expected = expected
+        self.actual = actual
+
+
+@dataclass
+class AccessController:
+    """Keeps the active browser token mutable only when it has a secure token file."""
+
+    token: str | None
+    token_path: Path | None = None
+    _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
+
+    @property
+    def can_rotate(self) -> bool:
+        return bool(self.token and self.token_path)
+
+    def rotate(self) -> str:
+        if not self.can_rotate or self.token_path is None:
+            raise ValueError(
+                "access token rotation is available only for automatically managed LAN tokens"
+            )
+        token = secrets.token_urlsafe(32)
+        with self._lock:
+            try:
+                self.token_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                descriptor = os.open(self.token_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    handle.write(f"{token}\n")
+                self.token_path.chmod(0o600)
+            except OSError as exc:
+                raise ValueError(f"cannot rotate DiagramC access token: {exc}") from exc
+            self.token = token
+        return token
+
+
+class ProviderEndpointPolicy:
+    """Exact allowlist for model-provider hosts used by the local gateway."""
+
+    def __init__(self, allowed_hosts: set[str] | frozenset[str] = DEFAULT_PROVIDER_HOSTS) -> None:
+        self.allowed_hosts = frozenset(
+            host.strip().lower() for host in allowed_hosts if host.strip()
+        )
+
+    def validate(self, base_url: str) -> str:
+        parsed = urlparse(base_url)
+        host = (parsed.hostname or "").lower()
+        if host not in self.allowed_hosts:
+            allowed = ", ".join(sorted(self.allowed_hosts))
+            raise ValueError(
+                f"provider host {host or base_url} is not allowed; allowed hosts: {allowed}"
+            )
+        if host == "api.openai.com" and parsed.scheme != "https":
+            raise ValueError("api.openai.com requires an HTTPS baseUrl")
+        return host
+
+
+class SlidingWindowRateLimiter:
+    def __init__(self, limit: int = 12, window_seconds: float = 60.0) -> None:
+        self.limit = max(1, limit)
+        self.window_seconds = window_seconds
+        self._events: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def retry_after(self, client: str) -> int | None:
+        now = time.monotonic()
+        with self._lock:
+            events = self._events.setdefault(client, deque())
+            while events and now - events[0] >= self.window_seconds:
+                events.popleft()
+            if len(events) >= self.limit:
+                return max(1, int(self.window_seconds - (now - events[0])) + 1)
+            events.append(now)
+        return None
+
+
 class StudioStore:
     """Thread-safe, process-local coordinator for the shared Studio state file."""
 
@@ -112,6 +197,7 @@ class StudioStore:
             "workspace": None,
             "commandHistory": [],
             "modelProfile": None,
+            "auditLog": [],
         }
 
     @staticmethod
@@ -160,6 +246,10 @@ class StudioStore:
         profile = value.get("modelProfile")
         if profile is not None:
             state["modelProfile"] = self._shared_model_profile(profile)
+        audit = value.get("auditLog", [])
+        if not isinstance(audit, list) or not all(isinstance(record, dict) for record in audit):
+            raise ValueError("shared auditLog must be an array of objects")
+        state["auditLog"] = audit[-200:]
         return state
 
     def _write_unlocked(self, state: Dict[str, Any]) -> None:
@@ -183,33 +273,83 @@ class StudioStore:
         with self._lock:
             return self._read_unlocked()
 
-    def save_workspace(self, value: Any) -> Dict[str, Any]:
+    @staticmethod
+    def _check_revision(state: Dict[str, Any], expected_revision: Any) -> None:
+        if expected_revision is None:
+            return
+        if not isinstance(expected_revision, int) or expected_revision < 0:
+            raise ValueError("baseRevision must be a non-negative integer")
+        actual = int(state.get("revision", 0))
+        if expected_revision != actual:
+            raise RevisionConflict(expected_revision, actual)
+
+    def save_workspace(self, value: Any, *, expected_revision: int | None = None) -> Dict[str, Any]:
         document = DiagramDocument.model_validate(value).to_external_dict()
         with self._lock:
             state = self._read_unlocked()
+            self._check_revision(state, expected_revision)
             state["workspace"] = document
             self._touch(state)
             self._write_unlocked(state)
             return state
 
-    def save_command_history(self, value: Any) -> Dict[str, Any]:
+    def save_command_history(
+        self, value: Any, *, expected_revision: int | None = None
+    ) -> Dict[str, Any]:
         if not isinstance(value, list) or not all(isinstance(record, dict) for record in value):
             raise ValueError("commandHistory must be an array of objects")
         with self._lock:
             state = self._read_unlocked()
+            self._check_revision(state, expected_revision)
             state["commandHistory"] = value[-30:]
             self._touch(state)
             self._write_unlocked(state)
             return state
 
-    def save_model_profile(self, value: Any) -> Dict[str, Any]:
+    def save_model_profile(
+        self, value: Any, *, expected_revision: int | None = None
+    ) -> Dict[str, Any]:
         profile = self._shared_model_profile(value)
         with self._lock:
             state = self._read_unlocked()
+            self._check_revision(state, expected_revision)
             state["modelProfile"] = profile
             self._touch(state)
             self._write_unlocked(state)
             return state
+
+    def record_audit(self, event: str, client: str, details: Dict[str, str] | None = None) -> None:
+        if not event or len(event) > 120 or len(client) > 256:
+            return
+        safe_details = {
+            key: value
+            for key, value in (details or {}).items()
+            if isinstance(key, str)
+            and isinstance(value, str)
+            and len(key) <= 80
+            and len(value) <= 512
+            and not any(
+                secret in key.lower()
+                for secret in ("key", "token", "prompt", "secret", "authorization")
+            )
+        }
+        with self._lock:
+            state = self._read_unlocked()
+            audit = state["auditLog"]
+            audit.append(
+                {
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "event": event,
+                    "client": client,
+                    "details": safe_details,
+                }
+            )
+            state["auditLog"] = audit[-200:]
+            self._write_unlocked(state)
+
+    def audit_log(self) -> list[Dict[str, Any]]:
+        with self._lock:
+            return list(self._read_unlocked()["auditLog"])
 
 
 def _endpoint(base_url: str) -> str:
@@ -404,7 +544,14 @@ def replay_commands(request: ReplayCommandRequest) -> GatewayResponse:
     )
 
 
-def generate_commands(request: AiCommandRequest, *, timeout: float = 600.0) -> GatewayResponse:
+def generate_commands(
+    request: AiCommandRequest,
+    *,
+    timeout: float = 600.0,
+    provider_policy: ProviderEndpointPolicy | None = None,
+) -> GatewayResponse:
+    if provider_policy:
+        provider_policy.validate(request.provider.baseUrl)
     url = _endpoint(request.provider.baseUrl)
     base_document = _command_base_document(request)
     current = base_document.to_external_dict()
@@ -546,8 +693,21 @@ def access_token_for_host(
         raise RuntimeError(f"cannot create DiagramC access token at {path}: {exc}") from exc
 
 
-def make_handler(web_root: Path, store: StudioStore | None = None, access_token: str | None = None):
+def make_handler(
+    web_root: Path,
+    store: StudioStore | None = None,
+    access_token: str | AccessController | None = None,
+    provider_policy: ProviderEndpointPolicy | None = None,
+    rate_limiter: SlidingWindowRateLimiter | None = None,
+):
     studio_store = store or StudioStore(Path.home() / ".diagramc" / "studio-state.json")
+    access = (
+        access_token
+        if isinstance(access_token, AccessController)
+        else AccessController(access_token)
+    )
+    policy = provider_policy or ProviderEndpointPolicy()
+    limiter = rate_limiter or SlidingWindowRateLimiter()
 
     class DiagramCHandler(SimpleHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -557,24 +717,24 @@ def make_handler(web_root: Path, store: StudioStore | None = None, access_token:
             super().__init__(*args, directory=str(web_root), **kwargs)
 
         def _authorized(self) -> bool:
-            if not access_token:
+            if not access.token:
                 return True
             query = parse_qs(urlparse(self.path).query)
             supplied = query.get("token", [""])[0]
-            if supplied and hmac.compare_digest(supplied, access_token):
+            if supplied and hmac.compare_digest(supplied, access.token):
                 self._grant_access_cookie = True
                 return True
             for cookie in self.headers.get("Cookie", "").split(";"):
                 name, _, value = cookie.strip().partition("=")
-                if name == "diagramc_token" and hmac.compare_digest(value, access_token):
+                if name == "diagramc_token" and hmac.compare_digest(value, access.token):
                     return True
             return False
 
         def end_headers(self) -> None:
-            if self._grant_access_cookie and access_token:
+            if self._grant_access_cookie and access.token:
                 self.send_header(
                     "Set-Cookie",
-                    "diagramc_token=" + access_token + "; HttpOnly; SameSite=Strict; Path=/",
+                    "diagramc_token=" + access.token + "; HttpOnly; SameSite=Strict; Path=/",
                 )
             if not self.path.startswith("/api/"):
                 self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
@@ -582,12 +742,19 @@ def make_handler(web_root: Path, store: StudioStore | None = None, access_token:
                 self.send_header("Expires", "0")
             super().end_headers()
 
-        def _send_json(self, status: int, value: Dict[str, Any]) -> None:
+        def _send_json(
+            self,
+            status: int,
+            value: Dict[str, Any],
+            headers: dict[str, str] | None = None,
+        ) -> None:
             payload = json.dumps(value, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(payload)))
             self.send_header("Cache-Control", "no-store")
+            for name, header_value in (headers or {}).items():
+                self.send_header(name, header_value)
             self.end_headers()
             self.wfile.write(payload)
 
@@ -605,17 +772,21 @@ def make_handler(web_root: Path, store: StudioStore | None = None, access_token:
                     HTTPStatus.FORBIDDEN, {"error": "valid DiagramC access token required"}
                 )
                 return
-            if self.path == "/api/health":
+            path = urlparse(self.path).path
+            if path == "/api/health":
                 self._send_json(HTTPStatus.OK, {"status": "ok", "service": "diagramc-gateway"})
                 return
-            if self.path == "/api/studio/state":
+            if path == "/api/studio/state":
                 try:
                     self._send_json(HTTPStatus.OK, studio_store.read())
                 except Exception as exc:
                     print(f"[DiagramC Studio Store] {type(exc).__name__}: {exc}", flush=True)
                     self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                 return
-            if self.path.startswith("/api/"):
+            if path == "/api/studio/audit":
+                self._send_json(HTTPStatus.OK, {"records": studio_store.audit_log()})
+                return
+            if path.startswith("/api/"):
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "API route not found"})
                 return
             path = self.path.split("?", 1)[0]
@@ -632,13 +803,40 @@ def make_handler(web_root: Path, store: StudioStore | None = None, access_token:
                     HTTPStatus.FORBIDDEN, {"error": "valid DiagramC access token required"}
                 )
                 return
-            if self.path not in {"/api/ai/commands", "/api/commands/replay"}:
+            path = urlparse(self.path).path
+            client = self.client_address[0]
+            if path == "/api/security/access-token/rotate":
+                try:
+                    token = access.rotate()
+                    studio_store.record_audit("access-token.rotated", client)
+                    self._grant_access_cookie = True
+                    self._send_json(HTTPStatus.OK, {"token": token})
+                except ValueError as exc:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            if path not in {"/api/ai/commands", "/api/commands/replay"}:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "API route not found"})
                 return
             try:
                 data = self._read_json()
-                if self.path == "/api/ai/commands":
-                    result = generate_commands(AiCommandRequest.model_validate(data))
+                if path == "/api/ai/commands":
+                    retry_after = limiter.retry_after(client)
+                    if retry_after is not None:
+                        studio_store.record_audit("provider.rate-limited", client)
+                        self._send_json(
+                            HTTPStatus.TOO_MANY_REQUESTS,
+                            {"error": "AI request rate limit reached; try again shortly"},
+                            {"Retry-After": str(retry_after)},
+                        )
+                        return
+                    request = AiCommandRequest.model_validate(data)
+                    host = policy.validate(request.provider.baseUrl)
+                    result = generate_commands(request, provider_policy=policy)
+                    studio_store.record_audit(
+                        "provider.request.succeeded",
+                        client,
+                        {"host": host, "mode": request.mode},
+                    )
                 else:
                     result = replay_commands(ReplayCommandRequest.model_validate(data))
                 transaction = result.transaction.model_dump(
@@ -655,6 +853,10 @@ def make_handler(web_root: Path, store: StudioStore | None = None, access_token:
                     },
                 )
             except Exception as exc:  # API boundary: convert validation/provider failures to JSON.
+                if path == "/api/ai/commands":
+                    studio_store.record_audit(
+                        "provider.request.failed", client, {"error": type(exc).__name__}
+                    )
                 print(f"[DiagramC Gateway] {type(exc).__name__}: {exc}", flush=True)
                 self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
@@ -676,11 +878,17 @@ def make_handler(web_root: Path, store: StudioStore | None = None, access_token:
                 if not isinstance(data, dict):
                     raise ValueError("request body must be a JSON object")
                 if self.path == "/api/studio/workspace":
-                    state = studio_store.save_workspace(data.get("document"))
+                    state = studio_store.save_workspace(
+                        data.get("document"), expected_revision=data.get("baseRevision")
+                    )
                 elif self.path == "/api/studio/history":
-                    state = studio_store.save_command_history(data.get("records"))
+                    state = studio_store.save_command_history(
+                        data.get("records"), expected_revision=data.get("baseRevision")
+                    )
                 else:
-                    state = studio_store.save_model_profile(data.get("profile"))
+                    state = studio_store.save_model_profile(
+                        data.get("profile"), expected_revision=data.get("baseRevision")
+                    )
                 self._send_json(
                     HTTPStatus.OK,
                     {
@@ -688,6 +896,11 @@ def make_handler(web_root: Path, store: StudioStore | None = None, access_token:
                         "revision": state["revision"],
                         "updatedAt": state["updatedAt"],
                     },
+                )
+            except RevisionConflict as exc:
+                self._send_json(
+                    HTTPStatus.CONFLICT,
+                    {"error": str(exc), "revision": exc.actual},
                 )
             except Exception as exc:
                 print(f"[DiagramC Studio Store] {type(exc).__name__}: {exc}", flush=True)
@@ -702,14 +915,31 @@ def serve(
     web_root: Path | None = None,
     state_file: Path | None = None,
     access_token: str | None = None,
+    allowed_provider_hosts: set[str] | None = None,
+    ai_rate_limit: int = 12,
 ) -> None:
     root = (web_root or _repo_web_root()).resolve()
     if not (root / "index.html").is_file():
         raise FileNotFoundError(f"web build not found at {root}; run 'pnpm build' first")
     mimetypes.add_type("application/javascript", ".js")
     store = StudioStore(state_file or Path.home() / ".diagramc" / "studio-state.json")
-    resolved_token = access_token_for_host(host, access_token)
-    server = ThreadingHTTPServer((host, port), make_handler(root, store, resolved_token))
+    token_path = (
+        None
+        if access_token or _is_loopback_host(host)
+        else Path.home() / ".diagramc" / "access-token"
+    )
+    resolved_token = access_token_for_host(host, access_token, token_path)
+    access = AccessController(resolved_token, token_path)
+    server = ThreadingHTTPServer(
+        (host, port),
+        make_handler(
+            root,
+            store,
+            access,
+            ProviderEndpointPolicy(allowed_provider_hosts or DEFAULT_PROVIDER_HOSTS),
+            SlidingWindowRateLimiter(ai_rate_limit),
+        ),
+    )
     print(
         f"DiagramC Studio: http://{host}:{port}"
         + (f"/?token={resolved_token}" if resolved_token else "")

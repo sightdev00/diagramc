@@ -1,4 +1,6 @@
-from archviz.web_server import StudioStore
+from pytest import raises
+
+from archviz.web_server import RevisionConflict, StudioStore
 
 
 def _document(revision: int = 0):
@@ -72,3 +74,32 @@ def test_studio_store_persists_current_model_profile_without_api_key(tmp_path):
         "model": "diagram-model",
     }
     assert "apiKey" not in (tmp_path / "studio-state.json").read_text(encoding="utf-8")
+
+
+def test_studio_store_rejects_stale_shared_revision(tmp_path):
+    store = StudioStore(tmp_path / "studio-state.json")
+    store.save_workspace(_document())
+
+    with raises(RevisionConflict) as conflict:
+        store.save_command_history([], expected_revision=0)
+
+    assert conflict.value.actual == 1
+    state = store.save_command_history([], expected_revision=1)
+    assert state["revision"] == 2
+
+
+def test_studio_store_audit_is_bounded_and_never_changes_workspace_revision(tmp_path):
+    store = StudioStore(tmp_path / "studio-state.json")
+    state = store.save_workspace(_document())
+    for index in range(205):
+        store.record_audit(
+            "provider.request.succeeded",
+            "127.0.0.1",
+            {"host": "localhost", "apiKey": "must-not-persist", "sequence": str(index)},
+        )
+
+    restored = store.read()
+    assert restored["revision"] == state["revision"]
+    assert len(restored["auditLog"]) == 200
+    assert all("apiKey" not in record["details"] for record in restored["auditLog"])
+    assert "must-not-persist" not in (tmp_path / "studio-state.json").read_text(encoding="utf-8")

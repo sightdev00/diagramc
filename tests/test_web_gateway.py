@@ -7,7 +7,10 @@ import pytest
 
 from archviz.v2.models import Element, ElementKind
 from archviz.web_server import (
+    AccessController,
     AiCommandRequest,
+    ProviderEndpointPolicy,
+    SlidingWindowRateLimiter,
     ReplayCommandRequest,
     StudioStore,
     _command_base_document,
@@ -225,3 +228,84 @@ def test_replays_existing_create_as_update_in_modify_mode():
 
     assert result.candidate.elements[0].data["label"] == "Restored"
     assert any("replayed existing element" in item["message"] for item in result.diagnostics)
+
+
+def test_provider_endpoint_policy_uses_exact_host_allowlist():
+    policy = ProviderEndpointPolicy({"127.0.0.1"})
+
+    assert policy.validate("http://127.0.0.1:11434/v1") == "127.0.0.1"
+    with pytest.raises(ValueError, match="not allowed"):
+        policy.validate("https://evil.example/v1")
+    with pytest.raises(ValueError, match="HTTPS"):
+        ProviderEndpointPolicy().validate("http://api.openai.com/v1")
+
+
+def test_rate_limiter_returns_retry_after_for_excess_requests():
+    limiter = SlidingWindowRateLimiter(limit=1, window_seconds=60)
+
+    assert limiter.retry_after("127.0.0.1") is None
+    assert limiter.retry_after("127.0.0.1") is not None
+
+
+def test_rotated_token_invalidates_previous_browser_token(tmp_path):
+    web_root = tmp_path / "web"
+    web_root.mkdir()
+    (web_root / "index.html").write_text("<!doctype html><title>DiagramC</title>", encoding="utf-8")
+    access = AccessController("old-token", tmp_path / "access-token")
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        make_handler(web_root, StudioStore(tmp_path / "studio-state.json"), access),
+    )
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        rotate = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+        rotate.request("POST", "/api/security/access-token/rotate?token=old-token")
+        response = rotate.getresponse()
+        assert response.status == 200
+        token = json.loads(response.read())["token"]
+        rotate.close()
+
+        old = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+        old.request("GET", "/api/health?token=old-token")
+        assert old.getresponse().status == 403
+        old.close()
+
+        current = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+        current.request("GET", f"/api/health?token={token}")
+        assert current.getresponse().status == 200
+        current.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+
+
+def test_stale_workspace_save_returns_current_shared_revision(tmp_path):
+    web_root = tmp_path / "web"
+    web_root.mkdir()
+    (web_root / "index.html").write_text("<!doctype html><title>DiagramC</title>", encoding="utf-8")
+    store = StudioStore(tmp_path / "studio-state.json")
+    store.save_workspace(_request().document.to_external_dict())
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(web_root, store))
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        connection = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+        payload = json.dumps(
+            {"document": _request().document.to_external_dict(), "baseRevision": 0}
+        )
+        connection.request(
+            "PUT",
+            "/api/studio/workspace",
+            payload,
+            {"Content-Type": "application/json"},
+        )
+        response = connection.getresponse()
+        assert response.status == 409
+        assert json.loads(response.read())["revision"] == 1
+        connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)

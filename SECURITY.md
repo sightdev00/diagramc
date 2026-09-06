@@ -20,4 +20,7 @@ Maintainers will acknowledge reports, assess severity, communicate progress and 
 - LAN listeners require a token automatically; treat the printed URL as a credential.
 - The automatic token protects application access but does not encrypt traffic. Use HTTPS, a VPN or a trusted reverse proxy on untrusted networks.
 - Do not store production API keys in shared Studio state. Browser-held provider keys remain local to that browser.
+- Provider endpoints use an exact host allowlist. The default permits loopback providers and `api.openai.com`; use `--provider-allowlist` only for trusted hosts.
+- Shared Studio writes use revisions. On a conflict, Studio keeps the local work and stops automatic shared writes until you refresh.
+- Gateway audit records retain operational metadata only (time, event, client, allowed provider host, mode); API keys, prompts, tokens and authorization data are filtered. AI requests are rate-limited per client.
 - Only import SVG files from trusted sources. DiagramC sanitizes active content and external links, but SVG is a complex format and should be treated as untrusted input.

@@ -13,7 +13,7 @@ from .models import Diagram
 from .parser import load_diagram
 from .validator import validate_diagram
 from .v2 import load_document, save_document, validate_document
-from .web_server import serve as serve_studio
+from .web_server import DEFAULT_PROVIDER_HOSTS, serve as serve_studio
 
 
 app = typer.Typer(
@@ -45,9 +45,28 @@ def serve(
         "--token",
         help="Require this token for browser access (automatic for non-local hosts)",
     ),
+    provider_allowlist: str = typer.Option(
+        ",".join(sorted(DEFAULT_PROVIDER_HOSTS)),
+        "--provider-allowlist",
+        help="Comma-separated model-provider hosts allowed by the local gateway",
+    ),
+    ai_rate_limit: int = typer.Option(
+        12, "--ai-rate-limit", min=1, max=120, help="AI requests allowed per client each minute"
+    ),
 ):
     """Serve DiagramC Studio and its local/remote model Provider Gateway."""
-    serve_studio(host=host, port=port, web_root=web_root, state_file=state_file, access_token=token)
+    hosts = {host.strip().lower() for host in provider_allowlist.split(",") if host.strip()}
+    if not hosts:
+        raise typer.BadParameter("provider allowlist cannot be empty")
+    serve_studio(
+        host=host,
+        port=port,
+        web_root=web_root,
+        state_file=state_file,
+        access_token=token,
+        allowed_provider_hosts=hosts,
+        ai_rate_limit=ai_rate_limit,
+    )
 
 
 @app.command("schema-v2")

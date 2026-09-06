@@ -10,8 +10,34 @@ export interface SharedStudioState {
   modelProfile?: unknown;
 }
 
-async function responseJson(response: Response) {
-  const value = (await response.json().catch(() => ({}))) as { error?: string };
+export interface SharedSaveResult {
+  revision: number;
+  updatedAt?: string | null;
+}
+
+export class SharedRevisionConflict extends Error {
+  constructor(
+    public readonly revision: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "SharedRevisionConflict";
+  }
+}
+
+async function responseJson(
+  response: Response,
+): Promise<Record<string, unknown>> {
+  const value = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    revision?: unknown;
+  };
+  if (response.status === 409 && typeof value.revision === "number") {
+    throw new SharedRevisionConflict(
+      value.revision,
+      value.error || "shared Studio state changed",
+    );
+  }
   if (!response.ok) throw new Error(value.error || `HTTP ${response.status}`);
   return value;
 }
@@ -24,34 +50,44 @@ export async function loadSharedStudioState(
     cache: "no-store",
     signal,
   });
-  return (await responseJson(response)) as SharedStudioState;
+  return (await responseJson(response)) as unknown as SharedStudioState;
 }
 
-export async function saveSharedWorkspace(
+async function saveShared(
+  endpoint: string,
+  body: Record<string, unknown>,
+  baseRevision?: number,
+): Promise<SharedSaveResult> {
+  const response = await fetch(endpoint, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ ...body, baseRevision }),
+  });
+  return (await responseJson(response)) as unknown as SharedSaveResult;
+}
+
+export function saveSharedWorkspace(
   document: DiagramDocument,
-): Promise<void> {
-  const response = await fetch("/api/studio/workspace", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ document }),
-  });
-  await responseJson(response);
+  baseRevision?: number,
+): Promise<SharedSaveResult> {
+  return saveShared("/api/studio/workspace", { document }, baseRevision);
 }
 
-export async function saveSharedCommandHistory(
+export function saveSharedCommandHistory(
   records: AiCommandRecord[],
-): Promise<void> {
-  const response = await fetch("/api/studio/history", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ records: records.slice(-30) }),
-  });
-  await responseJson(response);
+  baseRevision?: number,
+): Promise<SharedSaveResult> {
+  return saveShared(
+    "/api/studio/history",
+    { records: records.slice(-30) },
+    baseRevision,
+  );
 }
 
-export async function saveSharedModelProfile(
+export function saveSharedModelProfile(
   profile: ModelProfile,
-): Promise<void> {
+  baseRevision?: number,
+): Promise<SharedSaveResult> {
   const sharedProfile: Omit<ModelProfile, "apiKey"> = {
     id: profile.id,
     name: profile.name,
@@ -59,10 +95,9 @@ export async function saveSharedModelProfile(
     baseUrl: profile.baseUrl,
     model: profile.model,
   };
-  const response = await fetch("/api/studio/model-profile", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ profile: sharedProfile }),
-  });
-  await responseJson(response);
+  return saveShared(
+    "/api/studio/model-profile",
+    { profile: sharedProfile },
+    baseRevision,
+  );
 }

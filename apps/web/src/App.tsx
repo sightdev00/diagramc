@@ -34,6 +34,7 @@ import {
 } from "./modelProfiles";
 import {
   loadSharedStudioState,
+  SharedRevisionConflict,
   saveSharedCommandHistory,
   saveSharedModelProfile,
   saveSharedWorkspace,
@@ -302,8 +303,10 @@ export function App() {
   const moveCommitTimerRef = useRef<number | undefined>(undefined);
   const commandHistoryRef = useRef<AiCommandRecord[]>(INITIAL_COMMAND_HISTORY);
   const sharedStoreAvailableRef = useRef(false);
+  const sharedRevisionRef = useRef<number | undefined>(undefined);
   const sharedWorkspaceTimerRef = useRef<number | undefined>(undefined);
   const sharedHistoryTimerRef = useRef<number | undefined>(undefined);
+  const sharedSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const deletedDocumentIdsRef = useRef(new Set<string>());
 
   const [document, setDocument] = useState<DiagramDocument | undefined>(
@@ -474,6 +477,37 @@ export function App() {
     }
   }, []);
 
+  const handleSharedSaveError = useCallback(
+    (error: unknown, fallback: string) => {
+      if (error instanceof SharedRevisionConflict) {
+        sharedRevisionRef.current = error.revision;
+        sharedStoreAvailableRef.current = false;
+        setStatus("服务端共享版本已改变：当前本地修改未覆盖，请刷新后再处理。");
+        return;
+      }
+      sharedStoreAvailableRef.current = false;
+      const reason = error instanceof Error ? error.message : String(error);
+      setStatus(fallback + "，已继续保存在本机：" + reason);
+    },
+    [],
+  );
+
+  const queueSharedSave = useCallback(
+    (save: (baseRevision?: number) => Promise<{ revision: number }>) => {
+      const pending = sharedSaveQueueRef.current.then(async () => {
+        const result = await save(sharedRevisionRef.current);
+        sharedRevisionRef.current = result.revision;
+        return result;
+      });
+      sharedSaveQueueRef.current = pending.then(
+        () => undefined,
+        () => undefined,
+      );
+      return pending;
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!profiles.some((profile) => profile.id === activeProfileId)) {
       setActiveProfileId(profiles[0]?.id ?? "");
@@ -511,16 +545,17 @@ export function App() {
     const snapshot = clone(commandHistory);
     sharedHistoryTimerRef.current = window.setTimeout(() => {
       sharedHistoryTimerRef.current = undefined;
-      saveSharedCommandHistory(snapshot).catch((error: Error) => {
-        sharedStoreAvailableRef.current = false;
-        setStatus(`共享命令历史保存失败，已继续保存在本机：${error.message}`);
+      void queueSharedSave((baseRevision) =>
+        saveSharedCommandHistory(snapshot, baseRevision),
+      ).catch((error: unknown) => {
+        handleSharedSaveError(error, "共享命令历史保存失败");
       });
     }, 350);
     return () => {
       if (sharedHistoryTimerRef.current !== undefined)
         window.clearTimeout(sharedHistoryTimerRef.current);
     };
-  }, [commandHistory]);
+  }, [commandHistory, handleSharedSaveError, queueSharedSave]);
 
   useEffect(() => {
     documentRef.current = document;
@@ -547,16 +582,17 @@ export function App() {
     const snapshot = clone(document);
     sharedWorkspaceTimerRef.current = window.setTimeout(() => {
       sharedWorkspaceTimerRef.current = undefined;
-      saveSharedWorkspace(snapshot).catch((error: Error) => {
-        sharedStoreAvailableRef.current = false;
-        setStatus(`共享工作区保存失败，已继续保存在本机：${error.message}`);
+      void queueSharedSave((baseRevision) =>
+        saveSharedWorkspace(snapshot, baseRevision),
+      ).catch((error: unknown) => {
+        handleSharedSaveError(error, "共享工作区保存失败");
       });
     }, 350);
     return () => {
       if (sharedWorkspaceTimerRef.current !== undefined)
         window.clearTimeout(sharedWorkspaceTimerRef.current);
     };
-  }, [document]);
+  }, [document, handleSharedSaveError, queueSharedSave]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -564,7 +600,7 @@ export function App() {
       try {
         const state = await loadSharedStudioState(controller.signal);
         if (controller.signal.aborted) return;
-        sharedStoreAvailableRef.current = true;
+        sharedRevisionRef.current = state.revision;
 
         const sharedProfile = normalizeSharedModelProfile(state.modelProfile);
         if (sharedProfile) {
@@ -595,7 +631,10 @@ export function App() {
           setDocument(clone(workspace));
           restoredFromServer = true;
         } else if (SAVED_DOCUMENT && workspace) {
-          await saveSharedWorkspace(workspace);
+          const localWorkspace = workspace;
+          await queueSharedSave((baseRevision) =>
+            saveSharedWorkspace(localWorkspace, baseRevision),
+          );
         }
 
         const serverHistory = normalizeCommandHistory(state.commandHistory);
@@ -606,8 +645,12 @@ export function App() {
         commandHistoryRef.current = history;
         setCommandHistory(history);
         if (!serverHistory.length && history.length) {
-          await saveSharedCommandHistory(history);
+          await queueSharedSave((baseRevision) =>
+            saveSharedCommandHistory(history, baseRevision),
+          );
         }
+
+        sharedStoreAvailableRef.current = true;
 
         const pending = [...history]
           .reverse()
@@ -1627,12 +1670,22 @@ export function App() {
   const saveCurrentModelProfile = async () => {
     if (!activeProfile) return;
     try {
-      await saveSharedModelProfile(activeProfile);
+      await queueSharedSave((baseRevision) =>
+        saveSharedModelProfile(activeProfile, baseRevision),
+      );
       sharedStoreAvailableRef.current = true;
       setAiStatus(
         "已保存当前模型配置到共享工作区；API Key 不会同步，请在其他设备单独填写。",
       );
     } catch (error) {
+      if (error instanceof SharedRevisionConflict) {
+        sharedRevisionRef.current = error.revision;
+        sharedStoreAvailableRef.current = false;
+        setAiStatus(
+          "服务端共享版本已改变：当前模型配置未覆盖，请刷新后再处理。",
+        );
+        return;
+      }
       setAiStatus(
         "共享模型配置保存失败：" +
           (error instanceof Error ? error.message : String(error)),
