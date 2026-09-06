@@ -959,3 +959,20 @@ button.danger {
   border-radius: 6px;
   font-size: 12px;
 }
+
+.svg-diagnostics {
+  margin: 4px 0 10px;
+  padding: 9px 10px;
+  color: #76572a;
+  background: #fff8e5;
+  border: 1px solid #e7d29d;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.svg-diagnostics ul {
+  margin: 5px 0 0;
+  padding-left: 18px;
+}
+.svg-diagnostics li + li {
+  margin-top: 3px;
+}

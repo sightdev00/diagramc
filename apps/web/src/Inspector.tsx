@@ -607,6 +607,11 @@ export function Inspector({
     element!.kind === "image" &&
     element!.semanticType === "svg.imported.fidelity"
   ) {
+    const diagnostics = Array.isArray(element!.data.svgDiagnostics)
+      ? element!.data.svgDiagnostics.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [];
     return (
       <div className="inspector">
         <div className="selection-kicker">保真 SVG · 可编辑源码</div>
@@ -640,6 +645,23 @@ export function Inspector({
             />
           </label>
         </div>
+
+        {diagnostics.length ? (
+          <section className="svg-diagnostics">
+            <strong>{"\u6e90\u7801\u8bca\u65ad"}</strong>
+            <ul>
+              {diagnostics.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          </section>
+        ) : (
+          <div className="batch-tip">
+            {
+              "SVG \u6e90\u7801\u901a\u8fc7\u5b89\u5168\u68c0\u67e5\uff0c\u672a\u53d1\u73b0\u9700\u8981\u79fb\u9664\u7684\u5185\u5bb9\u3002"
+            }
+          </div>
+        )}
         <SvgSourceEditor
           elementId={element!.id}
           source={text(element!.data.svgSource)}

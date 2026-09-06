@@ -584,25 +584,52 @@ export function importSvgDocument(
   };
 }
 
-function imageDataUrlFromSvg(root: SVGElement) {
-  for (const unsafe of root.querySelectorAll(
+function sanitizeSvg(root: SVGElement) {
+  const diagnostics: string[] = [];
+  const unsafe = root.querySelectorAll(
     "script, foreignObject, iframe, object, embed",
-  ))
-    unsafe.remove();
+  );
+  if (unsafe.length) {
+    unsafe.forEach((element) => element.remove());
+    diagnostics.push(
+      `\u5df2\u79fb\u9664 ${unsafe.length} \u4e2a\u4e0d\u5b89\u5168\u7684\u5d4c\u5165\u5143\u7d20`,
+    );
+  }
+  let handlers = 0;
+  let externalReferences = 0;
   for (const element of [root, ...Array.from(root.querySelectorAll("*"))]) {
     for (const attribute of element.getAttributeNames()) {
       const value = element.getAttribute(attribute) ?? "";
-      if (attribute.toLowerCase().startsWith("on"))
+      if (attribute.toLowerCase().startsWith("on")) {
         element.removeAttribute(attribute);
+        handlers += 1;
+      }
       if (
         (attribute === "href" || attribute === "xlink:href") &&
         /^(?:https?:|file:|javascript:)/i.test(value.trim())
       ) {
         element.removeAttribute(attribute);
+        externalReferences += 1;
       }
     }
   }
+  if (handlers)
+    diagnostics.push(
+      `\u5df2\u79fb\u9664 ${handlers} \u4e2a\u4e8b\u4ef6\u5904\u7406\u5668`,
+    );
+  if (externalReferences)
+    diagnostics.push(
+      `\u5df2\u79fb\u9664 ${externalReferences} \u4e2a\u5916\u90e8\u8d44\u6e90\u5f15\u7528`,
+    );
+  if (!root.hasAttribute("viewBox") && !root.hasAttribute("width"))
+    diagnostics.push(
+      "SVG \u672a\u58f0\u660e viewBox \u6216\u5bbd\u5ea6\uff0c\u663e\u793a\u5c3a\u5bf8\u53ef\u80fd\u4e0d\u7a33\u5b9a",
+    );
   root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  return diagnostics;
+}
+
+function imageDataUrlFromSvg(root: SVGElement) {
   const bytes = new TextEncoder().encode(
     new XMLSerializer().serializeToString(root),
   );
@@ -618,11 +645,14 @@ export function prepareSvgSource(svgText: string) {
     root.tagName.toLowerCase() !== "svg" ||
     parsed.querySelector("parsererror")
   )
-    throw new Error("不是有效的 SVG 文件");
-  const imageUrl = imageDataUrlFromSvg(root);
-  return { imageUrl, svgSource: new XMLSerializer().serializeToString(root) };
+    throw new Error("\u4e0d\u662f\u6709\u6548\u7684 SVG \u6587\u4ef6");
+  const diagnostics = sanitizeSvg(root);
+  return {
+    imageUrl: imageDataUrlFromSvg(root),
+    svgSource: new XMLSerializer().serializeToString(root),
+    diagnostics,
+  };
 }
-
 /** Preserves an SVG as a lossless, movable and resizable canvas object. */
 export function importSvgImageDocument(
   svgText: string,
@@ -668,6 +698,7 @@ export function importSvgImageDocument(
           imageUrl: prepared.imageUrl,
           svgSource: prepared.svgSource,
           svgImportMode: "fidelity",
+          svgDiagnostics: prepared.diagnostics,
         },
       },
     ],

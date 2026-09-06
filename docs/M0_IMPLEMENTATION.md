@@ -23,7 +23,7 @@ Last updated: 2026-09-05
 
 - Fidelity import keeps a sanitized SVG as a resizable vector canvas object.
 - Structured import maps common primitives to editable DiagramC elements and relations.
-- Fidelity SVG source can be edited and applied immediately to refresh the rendered image.
+- Fidelity SVG source can be pasted or edited and applied immediately to refresh the rendered image; sanitization diagnostics report removed unsafe content.
 
 ### AI and state
 
@@ -57,7 +57,7 @@ The terminal prints a protected access URL. The token provides access control on
 ## Known boundaries
 
 - Fidelity SVG is intentionally an overall vector object, not an automatic per-element editor.
-- Raw Mermaid and raw SVG paste-to-apply workflows are planned for v0.2.
+- Raw Mermaid flowchart and fidelity SVG source can be pasted into Studio as new editable diagrams.
 - The web entry bundle is currently large because X6 and ELK are not code-split.
 - Shared state is process-local and does not yet implement multi-user conflict resolution.
 - Provider URLs are user-configurable; enterprise deployments should add host/network allowlists and request auditing.

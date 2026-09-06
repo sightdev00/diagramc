@@ -29,6 +29,7 @@ This makes diagrams reviewable, repeatable and suitable for both hand editing an
 - AI command preview before application; supports Ollama and OpenAI-compatible providers.
 - Paste AI-generated Mermaid flowchart source and convert common nodes, subgraphs and labeled edges into editable diagrams.
 - SVG import in fidelity mode (preserve appearance) or structured mode (convert to editable nodes and edges).
+- Paste raw AI-generated SVG source into a new fidelity diagram; sanitization diagnostics explain removed unsafe content.
 - Editable fidelity-SVG source: apply source updates directly to the canvas.
 - Optional shared Studio state and protected LAN access with an automatic token.
 

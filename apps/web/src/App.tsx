@@ -1010,15 +1010,23 @@ export function App() {
     if (!selected || selected.kind !== "image") return;
     try {
       const prepared = prepareSvgSource(svgSource);
-      commit((draft) => {
-        const element = draft.elements.find((item) => item.id === selected.id);
-        if (!element) return;
-        element.data.svgSource = prepared.svgSource;
-        element.data.imageUrl = prepared.imageUrl;
-      }, "已应用 SVG 源码修改");
+      commit(
+        (draft) => {
+          const element = draft.elements.find(
+            (item) => item.id === selected.id,
+          );
+          if (!element) return;
+          element.data.svgSource = prepared.svgSource;
+          element.data.imageUrl = prepared.imageUrl;
+          element.data.svgDiagnostics = prepared.diagnostics;
+        },
+        prepared.diagnostics.length
+          ? `\u5df2\u5e94\u7528 SVG \u6e90\u7801\u4fee\u6539\uff1a${prepared.diagnostics.join("\uFF1B")}`
+          : "\u5df2\u5e94\u7528 SVG \u6e90\u7801\u4fee\u6539",
+      );
     } catch (error) {
       setStatus(
-        "SVG 源码无效：" +
+        "SVG \u6e90\u7801\u65e0\u6548\uff1a" +
           (error instanceof Error ? error.message : String(error)),
       );
     }
@@ -1504,6 +1512,17 @@ export function App() {
     );
   };
 
+  const applySvgSource = (source: string) => {
+    const imported = importSvgImageDocument(source, "AI SVG \u6e90\u7801.svg");
+    const diagnostics = Array.isArray(imported.elements[0]?.data.svgDiagnostics)
+      ? imported.elements[0].data.svgDiagnostics.length
+      : 0;
+    openImportedDocument(
+      imported,
+      `\u5df2\u5e94\u7528 SVG \u6e90\u7801\uff1a\u4fdd\u771f\u5bfc\u5165${diagnostics ? `\uff08${diagnostics} \u6761\u5b89\u5168\u8bca\u65ad\uff09` : ""}`,
+    );
+  };
+
   const openFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1931,6 +1950,9 @@ export function App() {
           >
             {"\u5e94\u7528 Mermaid"}
           </button>
+          <button className="quiet" onClick={() => setSourceImportKind("svg")}>
+            {"\u5e94\u7528 SVG"}
+          </button>
           <button className="quiet" onClick={newBlankDocument}>
             新建图
           </button>
@@ -2063,7 +2085,9 @@ export function App() {
       {sourceImportKind && (
         <SourceImportDialog
           kind={sourceImportKind}
-          onApply={applyMermaidSource}
+          onApply={
+            sourceImportKind === "svg" ? applySvgSource : applyMermaidSource
+          }
           onClose={() => setSourceImportKind(undefined)}
         />
       )}

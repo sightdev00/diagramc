@@ -17,7 +17,7 @@
 - [ ] Paste and apply raw SVG source directly from AI output.
 - [x] Paste and apply Mermaid flowchart source directly from AI output.
 - [x] Mermaid flowchart parser for common flowchart syntax, shapes, subgraphs and labels.
-- [ ] Improve fidelity SVG editing feedback and source diagnostics.
+- [x] Improve fidelity SVG editing feedback and source diagnostics.
 
 ## v0.3.0 — Reliability and collaboration
 

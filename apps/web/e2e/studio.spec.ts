@@ -39,3 +39,24 @@ flowchart LR
   await expect(page.locator(".outline-relations button")).toHaveCount(2);
   await expect(page.getByRole("button", { name: "Input" })).toBeVisible();
 });
+
+
+test("applies SVG source and reports sanitization diagnostics", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "\u5e94\u7528 SVG" }).click();
+
+  await page.getByRole("textbox", { name: "SVG \u6e90\u7801" }).fill(`
+    <svg viewBox="0 0 320 160" onload="alert(1)">
+      <script>alert(1)</script>
+      <rect x="20" y="20" width="180" height="70" fill="#cde8db" />
+      <a href="https://example.com"><text x="30" y="65">AI SVG</text></a>
+    </svg>
+  `);
+  await page.getByRole("button", { name: "\u5e94\u7528\u4e3a\u65b0\u56fe" }).click();
+
+  await expect(page.getByLabel("\u56fe\u540d\u79f0")).toHaveValue(
+    "AI SVG \u6e90\u7801",
+  );
+  await page.getByRole("button", { name: "AI SVG \u6e90\u7801" }).click();
+  await expect(page.getByText("\u6e90\u7801\u8bca\u65ad", { exact: true })).toBeVisible();
+});
