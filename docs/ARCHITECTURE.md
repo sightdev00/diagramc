@@ -75,4 +75,4 @@ API keys are never written to the shared Studio state. Non-loopback serving requ
 
 ## Extensibility
 
-The stable boundaries are semantic documents, transactions, layout adapters and renderers. Future Graphviz, Mermaid import, Figma integration and repository-analysis adapters should connect at these boundaries rather than coupling to the canvas implementation.
+The stable boundaries are semantic documents, transactions, layout adapters and renderers. Future Graphviz, Figma integration and repository-analysis adapters should connect at these boundaries rather than coupling to the canvas implementation.

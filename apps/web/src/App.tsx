@@ -18,8 +18,13 @@ import {
   type AiCommandRecord,
 } from "./commandHistory";
 import { CANVAS_THEME_OPTIONS } from "./canvasThemes";
+import {
+  SourceImportDialog,
+  type SourceImportKind,
+} from "./SourceImportDialog";
 import { Inspector, type ElementPatch, type RelationPatch } from "./Inspector";
 import { renderDocument } from "./diagram";
+import { importMermaidDocument } from "./mermaidImport";
 import {
   loadActiveProfileId,
   loadProfiles,
@@ -341,6 +346,9 @@ export function App() {
   const [svgImportMode, setSvgImportMode] = useState<"fidelity" | "structured">(
     "fidelity",
   );
+  const [sourceImportKind, setSourceImportKind] = useState<
+    SourceImportKind | undefined
+  >();
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false);
   const [exportNameDraft, setExportNameDraft] = useState("");
   const [exportBackground, setExportBackground] = useState(true);
@@ -1471,6 +1479,31 @@ export function App() {
     setStatus("已从图纸列表删除：" + document.document.title);
   };
 
+  const openImportedDocument = (value: DiagramDocument, message: string) => {
+    const imported = clone(value);
+    if (documents.some((item) => item.document.id === imported.document.id)) {
+      imported.document.id = `${imported.document.id}-import-${Date.now()}`;
+    }
+    undoRef.current = [];
+    redoRef.current = [];
+    fittedDocumentRef.current = undefined;
+    documentRef.current = imported;
+    setDocuments((current) => [...current, clone(imported)]);
+    setDocument(imported);
+    setSelectedIds([]);
+    setAiProposal(undefined);
+    setStatus(message);
+  };
+
+  const applyMermaidSource = (source: string) => {
+    const result = importMermaidDocument(source);
+    const { document: imported, diagnostics } = result;
+    openImportedDocument(
+      imported,
+      `\u5df2\u5e94\u7528 Mermaid \u6e90\u7801\uff1a${imported.elements.length} \u4e2a\u5143\u7d20\uff0c${imported.relations.length} \u6761\u8fde\u7ebf${diagnostics.length ? `\uff08${diagnostics.length} \u6761\u8bed\u53e5\u672a\u5b8c\u6574\u5bfc\u5165\uff09` : ""}`,
+    );
+  };
+
   const openFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1892,6 +1925,12 @@ export function App() {
           >
             导入 SVG
           </button>
+          <button
+            className="quiet"
+            onClick={() => setSourceImportKind("mermaid")}
+          >
+            {"\u5e94\u7528 Mermaid"}
+          </button>
           <button className="quiet" onClick={newBlankDocument}>
             新建图
           </button>
@@ -2020,6 +2059,14 @@ export function App() {
           </div>
         </div>
       </header>
+
+      {sourceImportKind && (
+        <SourceImportDialog
+          kind={sourceImportKind}
+          onApply={applyMermaidSource}
+          onClose={() => setSourceImportKind(undefined)}
+        />
+      )}
 
       <div className="toolbar">
         <div className="tool-group">

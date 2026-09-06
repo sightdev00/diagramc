@@ -903,3 +903,59 @@ button.danger {
     display: none;
   }
 }
+
+.source-import-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(25 33 30 / 46%);
+}
+.source-import-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(720px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  padding: 18px;
+  overflow: auto;
+  color: #313631;
+  background: #f8f7f3;
+  border: 1px solid #a7aaa0;
+  border-radius: 12px;
+  box-shadow: 0 24px 70px rgb(19 28 24 / 34%);
+}
+.source-import-heading,
+.source-import-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.source-import-heading > div {
+  display: grid;
+  gap: 4px;
+}
+.source-import-heading small,
+.source-import-actions small {
+  color: #74756d;
+  font-size: 11px;
+}
+.source-import-dialog textarea {
+  min-height: 260px;
+  resize: vertical;
+  font:
+    12px / 1.5 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+.source-import-error {
+  padding: 9px 10px;
+  color: #8a342b;
+  background: #fff0ed;
+  border: 1px solid #e8b7b0;
+  border-radius: 6px;
+  font-size: 12px;
+}
