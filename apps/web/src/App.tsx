@@ -53,6 +53,7 @@ import type {
   ModelProfile,
 } from "./types";
 import {
+  clearWorkspaceDocument,
   loadWorkspaceDocument,
   sanitizeWorkspaceDocument,
   saveWorkspaceDocument,
@@ -62,9 +63,14 @@ const DOCUMENTS_KEY = "diagramc.documents.v1";
 const RIGHT_TAB_KEY = "diagramc.rightTab.v1";
 
 const INITIAL_PROFILES = loadProfiles();
+const EMPTY_DOCUMENT_COLLECTION = hasEmptyDocumentCollection();
 const SAVED_DOCUMENT = loadWorkspaceDocument();
-const INITIAL_DOCUMENT = SAVED_DOCUMENT ?? createBlankDocument();
-const INITIAL_DOCUMENTS = loadDocumentCollection(INITIAL_DOCUMENT);
+const INITIAL_DOCUMENT = EMPTY_DOCUMENT_COLLECTION
+  ? undefined
+  : (SAVED_DOCUMENT ?? createBlankDocument());
+const INITIAL_DOCUMENTS = EMPTY_DOCUMENT_COLLECTION
+  ? []
+  : loadDocumentCollection(INITIAL_DOCUMENT!);
 const INITIAL_RIGHT_TAB = loadRightTab();
 const INITIAL_COMMAND_HISTORY = recoverHistoryCandidates(
   loadCommandHistory(),
@@ -264,6 +270,17 @@ function downloadJson(
   URL.revokeObjectURL(anchor.href);
 }
 
+function hasEmptyDocumentCollection() {
+  try {
+    const value: unknown = JSON.parse(
+      window.localStorage.getItem(DOCUMENTS_KEY) ?? "null",
+    );
+    return Array.isArray(value) && value.length === 0;
+  } catch {
+    return false;
+  }
+}
+
 function loadDocumentCollection(fallback: DiagramDocument): DiagramDocument[] {
   try {
     const value: unknown = JSON.parse(
@@ -337,7 +354,7 @@ export function App() {
   const [documents, setDocuments] =
     useState<DiagramDocument[]>(INITIAL_DOCUMENTS);
   const [documentTitleDraft, setDocumentTitleDraft] = useState(
-    INITIAL_DOCUMENT.document.title,
+    INITIAL_DOCUMENT?.document.title ?? "",
   );
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [zoomPercent, setZoomPercent] = useState(100);
@@ -609,10 +626,15 @@ export function App() {
         return next;
       });
     }
-    if (document && !saveWorkspaceDocument(document)) {
+    if (!document) {
+      if (!clearWorkspaceDocument())
+        setStatus("工作区清理失败：请清除浏览器本地存储后重试。");
+      return;
+    }
+    if (!saveWorkspaceDocument(document)) {
       setStatus("工作区自动保存失败：请导出 JSON 以免内容丢失。");
     }
-    if (!document || !sharedStoreAvailableRef.current) return;
+    if (!sharedStoreAvailableRef.current) return;
     if (sharedWorkspaceTimerRef.current !== undefined)
       window.clearTimeout(sharedWorkspaceTimerRef.current);
     const snapshot = clone(document);
@@ -1022,7 +1044,12 @@ export function App() {
 
   useEffect(() => {
     const graph = graphRef.current;
-    if (!graph || !document) return;
+    if (!graph) return;
+    if (!document) {
+      renderTokenRef.current += 1;
+      graph.clearCells();
+      return;
+    }
     const token = ++renderTokenRef.current;
     const shouldFit = fittedDocumentRef.current !== document.document.id;
     renderDocument(
@@ -1751,16 +1778,20 @@ export function App() {
     const remaining = documents.filter(
       (item) => item.document.id !== deletedId,
     );
-    const next = remaining[0] ? clone(remaining[0]) : createBlankDocument();
+    const next = remaining[0] ? clone(remaining[0]) : undefined;
     undoRef.current = [];
     redoRef.current = [];
     fittedDocumentRef.current = undefined;
     documentRef.current = next;
-    setDocuments(remaining.length ? remaining : [clone(next)]);
+    setDocuments(remaining);
     setDocument(next);
     setSelectedIds([]);
     setAiProposal(undefined);
-    setStatus("已从图纸列表删除：" + document.document.title);
+    setStatus(
+      remaining.length
+        ? "已从图纸列表删除：" + document.document.title
+        : "已删除最后一张图；可新建图或导入文件。",
+    );
   };
 
   const openImportedDocument = (value: DiagramDocument, message: string) => {
@@ -2177,6 +2208,7 @@ export function App() {
             className="document-title-input"
             aria-label="图名称"
             title="点击直接重命名"
+            disabled={!document}
             value={documentTitleDraft}
             onChange={(event) => setDocumentTitleDraft(event.target.value)}
             onFocus={() => {
@@ -2201,7 +2233,9 @@ export function App() {
             value={document?.document.id ?? ""}
             onChange={(event) => switchDocument(event.target.value)}
             title="切换图纸"
+            disabled={documents.length === 0}
           >
+            {documents.length === 0 && <option value="">无图纸</option>}
             {documents.map((item) => (
               <option key={item.document.id} value={item.document.id}>
                 {item.document.title || "未命名图"}
