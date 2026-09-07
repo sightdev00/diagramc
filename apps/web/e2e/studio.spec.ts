@@ -134,6 +134,28 @@ test("persists the selected interface theme", async ({ page }) => {
   );
 });
 
+test("offers night and warm interface themes", async ({ page }) => {
+  await page.goto("/");
+  const theme = page.getByLabel("界面主题");
+
+  await theme.selectOption("night");
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-night/);
+  await expect(page.locator(".toolbar")).toHaveCSS(
+    "background-color",
+    "rgb(23, 34, 49)",
+  );
+
+  await theme.selectOption("warm");
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-warm/);
+  await expect(page.locator(".topbar")).toHaveCSS(
+    "background-color",
+    "rgb(87, 58, 41)",
+  );
+
+  await page.reload();
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-warm/);
+});
+
 test("deletes the last diagram from the list", async ({ page }) => {
   page.on("dialog", (dialog) => dialog.accept());
   await page.goto("/");

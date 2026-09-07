@@ -122,7 +122,13 @@ const ELEMENT_TEMPLATES = [
   },
 ] as const;
 type ElementTemplateId = (typeof ELEMENT_TEMPLATES)[number]["id"];
-type UiTheme = "soft" | "contrast";
+const UI_THEME_OPTIONS = [
+  { id: "soft", label: "柔和" },
+  { id: "contrast", label: "高对比" },
+  { id: "night", label: "夜间" },
+  { id: "warm", label: "暖纸" },
+] as const;
+type UiTheme = (typeof UI_THEME_OPTIONS)[number]["id"];
 type AlignmentCommand =
   | "left"
   | "center"
@@ -308,9 +314,10 @@ function loadDocumentCollection(fallback: DiagramDocument): DiagramDocument[] {
 
 function loadUiTheme(): UiTheme {
   try {
-    return window.localStorage.getItem(UI_THEME_KEY) === "contrast"
-      ? "contrast"
-      : "soft";
+    const savedTheme = window.localStorage.getItem(UI_THEME_KEY);
+    return (
+      UI_THEME_OPTIONS.find((theme) => theme.id === savedTheme)?.id ?? "soft"
+    );
   } catch {
     return "soft";
   }
@@ -2736,8 +2743,11 @@ export function App() {
             value={uiTheme}
             onChange={(event) => setUiTheme(event.target.value as UiTheme)}
           >
-            <option value="soft">柔和</option>
-            <option value="contrast">高对比</option>
+            {UI_THEME_OPTIONS.map((theme) => (
+              <option key={theme.id} value={theme.id}>
+                {theme.label}
+              </option>
+            ))}
           </select>
         </div>
         <div className="tool-group relation-font-size">
