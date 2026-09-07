@@ -1065,6 +1065,11 @@ button.danger {
   display: grid;
   gap: 4px;
 }
+.source-import-dialog button.quiet {
+  color: #3c403c;
+  border-color: #a7aaa0;
+  background: #fffef9;
+}
 .source-import-heading small,
 .source-import-actions small {
   color: #74756d;
@@ -1221,4 +1226,10 @@ button.danger {
 .ui-contrast .empty-panel,
 .ui-contrast .ai-intro p {
   color: #40566e;
+}
+
+.ui-contrast .source-import-dialog button.quiet {
+  color: #14263a;
+  border-color: #62788f;
+  background: #ffffff;
 }

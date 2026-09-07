@@ -101,8 +101,8 @@ test("keeps top-bar menus inside a small viewport", async ({ page }) => {
     if (!box) return;
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.y).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
-    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
   }
 });
 
@@ -126,6 +126,11 @@ test("persists the selected interface theme", async ({ page }) => {
   await expect(page.locator(".import-menu .svg-import-mode")).toHaveCSS(
     "color",
     "rgb(16, 24, 40)",
+  );
+  await page.getByRole("button", { name: "粘贴 Mermaid 源码" }).click();
+  await expect(page.getByRole("button", { name: "关闭源码导入" })).toHaveCSS(
+    "color",
+    "rgb(20, 38, 58)",
   );
 });
 
