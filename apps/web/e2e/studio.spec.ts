@@ -68,6 +68,25 @@ test("creates, renames, edits, and exports a diagram", async ({ page }) => {
   expect(pngDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.png/);
 });
 
+test("deletes the last diagram from the list", async ({ page }) => {
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.goto("/");
+  await page.getByRole("button", { name: "删除图" }).click();
+
+  const switcher = page.getByLabel("切换图纸");
+  await expect(switcher).toBeDisabled();
+  await expect(switcher).toContainText("无图纸");
+  await expect(page.getByLabel("图名称")).toBeDisabled();
+
+  await page.reload();
+  await expect(switcher).toBeDisabled();
+  await expect(switcher).toContainText("无图纸");
+
+  await page.getByRole("button", { name: "新建图" }).click();
+  await expect(switcher).toBeEnabled();
+  await expect(switcher.locator("option")).toHaveCount(1);
+});
+
 test("aligns selected nodes and supports keyboard nudging", async ({ page }) => {
   await page.goto("/");
   await page.locator("select.element-picker").selectOption("process");

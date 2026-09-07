@@ -69,6 +69,15 @@ export function loadWorkspaceDocument(): DiagramDocument | undefined {
   }
 }
 
+export function clearWorkspaceDocument(): boolean {
+  try {
+    window.localStorage.removeItem(WORKSPACE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function saveWorkspaceDocument(document: DiagramDocument): boolean {
   try {
     window.localStorage.setItem(WORKSPACE_KEY, JSON.stringify(document));
