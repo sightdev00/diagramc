@@ -1118,9 +1118,12 @@ button.danger {
 .ui-contrast .document-title small {
   color: #d7e4f2;
 }
-.ui-contrast .document-title,
+.ui-contrast .document-title {
+  color: #ffffff;
+}
 .ui-contrast .document-title-input {
   color: #ffffff;
+  background: #18395c;
 }
 .ui-contrast .document-title-input:hover {
   border-color: #a8c5df;
