@@ -112,6 +112,10 @@ test("persists the selected interface theme", async ({ page }) => {
   await theme.selectOption("contrast");
   await expect(page.locator(".studio-shell")).toHaveClass(/ui-contrast/);
 
+  const title = page.getByLabel("图名称");
+  await title.focus();
+  await expect(title).toHaveCSS("color", "rgb(16, 24, 40)");
+
   await page.reload();
   await expect(page.locator(".studio-shell")).toHaveClass(/ui-contrast/);
 

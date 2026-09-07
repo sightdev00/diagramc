@@ -1126,6 +1126,11 @@ button.danger {
   border-color: #a8c5df;
   background: #18395c;
 }
+.ui-contrast .document-title-input:focus {
+  color: #101828;
+  border-color: #5b92c2;
+  background: #ffffff;
+}
 .ui-contrast .toolbar,
 .ui-contrast .outline-panel,
 .ui-contrast .right-panel,
