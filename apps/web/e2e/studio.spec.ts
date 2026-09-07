@@ -83,6 +83,29 @@ test("keeps document menus mutually exclusive and dismissible", async ({ page })
   await expect(page.locator("#import-menu")).toBeHidden();
 });
 
+test("keeps top-bar menus inside a small viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 480 });
+  await page.goto("/");
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  if (!viewport) return;
+
+  for (const [trigger, menu] of [
+    ["文件 ▾", "#file-menu"],
+    ["导入 ▾", "#import-menu"],
+    ["导出 ▾", "#export-options"],
+  ]) {
+    await page.getByRole("button", { name: trigger }).click();
+    const box = await page.locator(menu).boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  }
+});
+
 test("persists the selected interface theme", async ({ page }) => {
   await page.goto("/");
   const theme = page.getByLabel("界面主题");
