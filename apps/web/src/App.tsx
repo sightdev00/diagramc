@@ -61,6 +61,7 @@ import {
 
 const DOCUMENTS_KEY = "diagramc.documents.v1";
 const RIGHT_TAB_KEY = "diagramc.rightTab.v1";
+const UI_THEME_KEY = "diagramc.uiTheme.v1";
 
 const INITIAL_PROFILES = loadProfiles();
 const EMPTY_DOCUMENT_COLLECTION = hasEmptyDocumentCollection();
@@ -121,6 +122,7 @@ const ELEMENT_TEMPLATES = [
   },
 ] as const;
 type ElementTemplateId = (typeof ELEMENT_TEMPLATES)[number]["id"];
+type UiTheme = "soft" | "contrast";
 type AlignmentCommand =
   | "left"
   | "center"
@@ -304,6 +306,16 @@ function loadDocumentCollection(fallback: DiagramDocument): DiagramDocument[] {
   return [fallback];
 }
 
+function loadUiTheme(): UiTheme {
+  try {
+    return window.localStorage.getItem(UI_THEME_KEY) === "contrast"
+      ? "contrast"
+      : "soft";
+  } catch {
+    return "soft";
+  }
+}
+
 function loadRightTab(): "inspect" | "ai" {
   try {
     return window.localStorage.getItem(RIGHT_TAB_KEY) === "ai"
@@ -365,6 +377,7 @@ export function App() {
     SAVED_DOCUMENT ? "已恢复上次工作区" : "空白工作区已就绪",
   );
   const [rightTab, setRightTab] = useState<"inspect" | "ai">(INITIAL_RIGHT_TAB);
+  const [uiTheme, setUiTheme] = useState<UiTheme>(loadUiTheme);
   const [profiles, setProfiles] = useState<ModelProfile[]>(INITIAL_PROFILES);
   const [activeProfileId, setActiveProfileId] = useState(() =>
     loadActiveProfileId(INITIAL_PROFILES),
@@ -581,6 +594,14 @@ export function App() {
       setStatus("图纸列表保存失败：请导出 JSON 以免内容丢失。");
     }
   }, [documents]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(UI_THEME_KEY, uiTheme);
+    } catch {
+      // The UI theme is non-critical when storage is disabled.
+    }
+  }, [uiTheme]);
 
   useEffect(() => {
     try {
@@ -2228,7 +2249,7 @@ export function App() {
     document?.elements.filter((element) => element.kind !== "group") ?? [];
 
   return (
-    <div className="studio-shell">
+    <div className={`studio-shell ui-${uiTheme}`}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark">D</span>
@@ -2694,7 +2715,7 @@ export function App() {
           <button onClick={fitCanvas}>适应</button>
         </div>
         <div className="tool-group theme-switch">
-          <span>视觉主题</span>
+          <span>画布主题</span>
           <select
             value={activeTheme}
             onChange={(event) =>
@@ -2706,6 +2727,17 @@ export function App() {
                 {theme.label}
               </option>
             ))}
+          </select>
+        </div>
+        <div className="tool-group ui-theme-switch">
+          <span>界面</span>
+          <select
+            aria-label="界面主题"
+            value={uiTheme}
+            onChange={(event) => setUiTheme(event.target.value as UiTheme)}
+          >
+            <option value="soft">柔和</option>
+            <option value="contrast">高对比</option>
           </select>
         </div>
         <div className="tool-group relation-font-size">

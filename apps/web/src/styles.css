@@ -284,6 +284,23 @@ button {
   background: #2b3834;
   font-size: 10px;
 }
+.file-menu .diagram-switcher,
+.import-menu .svg-import-mode {
+  width: 100%;
+  color: #2a302d;
+  border-color: #bdb9ae;
+  background: #fffef9;
+}
+.file-menu button:not(.danger),
+.import-menu button,
+.export-menu button:not(.primary) {
+  color: #2a302d;
+  border-color: #c8c5bc;
+  background: #fffef9;
+}
+.export-menu button.quiet {
+  color: #56635f;
+}
 button {
   min-height: 30px;
   padding: 5px 11px;
@@ -336,11 +353,13 @@ button.primary {
 }
 .layout-switch,
 .theme-switch,
+.ui-theme-switch,
 .zoom-switch {
   align-items: center;
 }
 .layout-switch span,
 .theme-switch span,
+.ui-theme-switch span,
 .zoom-switch span {
   margin-right: 3px;
   color: #78766f;
@@ -352,7 +371,8 @@ button.primary {
   border-color: #4b6660;
   background: #4b6660;
 }
-.theme-switch select {
+.theme-switch select,
+.ui-theme-switch select {
   width: 112px;
   min-height: 31px;
   margin: 0;
@@ -1081,4 +1101,114 @@ button.danger {
 }
 .svg-diagnostics li + li {
   margin-top: 3px;
+}
+
+.ui-contrast {
+  color: #101828;
+  background: #ffffff;
+}
+.ui-contrast .topbar {
+  color: #ffffff;
+  background: #0b1f3a;
+  border-bottom-color: #294866;
+}
+.ui-contrast .brand small,
+.ui-contrast .document-title small {
+  color: #d7e4f2;
+}
+.ui-contrast .document-title,
+.ui-contrast .document-title-input {
+  color: #ffffff;
+}
+.ui-contrast .document-title-input:hover {
+  border-color: #a8c5df;
+  background: #18395c;
+}
+.ui-contrast .toolbar,
+.ui-contrast .outline-panel,
+.ui-contrast .right-panel,
+.ui-contrast .canvas-wrap {
+  background: #ffffff;
+  border-color: #9aacbd;
+}
+.ui-contrast .toolbar {
+  box-shadow: none;
+}
+.ui-contrast .tool-group {
+  border-color: #b4c2d0;
+}
+.ui-contrast .tool-group span,
+.ui-contrast .toolbar-status,
+.ui-contrast label {
+  color: #26384a;
+}
+.ui-contrast button {
+  color: #14263a;
+  border-color: #62788f;
+  background: #ffffff;
+}
+.ui-contrast button.quiet {
+  color: #ffffff;
+  border-color: #91aec8;
+  background: transparent;
+}
+.ui-contrast button.primary {
+  color: #ffffff;
+  border-color: #0a5ca8;
+  background: #0a5ca8;
+}
+.ui-contrast .layout-switch button.active {
+  color: #ffffff;
+  border-color: #0a5ca8;
+  background: #0a5ca8;
+}
+.ui-contrast input,
+.ui-contrast select,
+.ui-contrast textarea,
+.ui-contrast .element-picker,
+.ui-contrast .theme-switch select,
+.ui-contrast .ui-theme-switch select,
+.ui-contrast .relation-font-size input {
+  color: #101828;
+  border-color: #62788f;
+  background: #ffffff;
+}
+.ui-contrast .file-menu,
+.ui-contrast .import-menu,
+.ui-contrast .export-menu,
+.ui-contrast .arrange-menu {
+  color: #101828;
+  background: #ffffff;
+  border-color: #62788f;
+  box-shadow: 0 12px 30px rgb(15 35 55 / 28%);
+}
+.ui-contrast .file-menu .diagram-switcher,
+.ui-contrast .import-menu .svg-import-mode,
+.ui-contrast .file-menu button:not(.danger),
+.ui-contrast .import-menu button,
+.ui-contrast .export-menu button:not(.primary),
+.ui-contrast .arrange-menu button {
+  color: #101828;
+  border-color: #62788f;
+  background: #ffffff;
+}
+.ui-contrast .export-menu button.quiet {
+  color: #14263a;
+}
+.ui-contrast .menu-heading strong,
+.ui-contrast .export-menu-heading strong,
+.ui-contrast .panel-heading span,
+.ui-contrast .empty-panel strong,
+.ui-contrast .ai-intro strong {
+  color: #102f50;
+}
+.ui-contrast .menu-heading small,
+.ui-contrast .menu-field,
+.ui-contrast .export-menu .export-field,
+.ui-contrast .export-check,
+.ui-contrast .panel-heading small,
+.ui-contrast .selection-kicker,
+.ui-contrast .empty-panel,
+.ui-contrast .ai-intro p {
+  color: #40566e;
 }

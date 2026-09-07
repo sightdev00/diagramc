@@ -83,6 +83,23 @@ test("keeps document menus mutually exclusive and dismissible", async ({ page })
   await expect(page.locator("#import-menu")).toBeHidden();
 });
 
+test("persists the selected interface theme", async ({ page }) => {
+  await page.goto("/");
+  const theme = page.getByLabel("界面主题");
+  await theme.selectOption("contrast");
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-contrast/);
+
+  await page.reload();
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-contrast/);
+
+  await page.getByRole("button", { name: "导入 ▾" }).click();
+  await expect(page.locator(".import-menu .svg-import-mode")).toBeVisible();
+  await expect(page.locator(".import-menu .svg-import-mode")).toHaveCSS(
+    "color",
+    "rgb(16, 24, 40)",
+  );
+});
+
 test("deletes the last diagram from the list", async ({ page }) => {
   page.on("dialog", (dialog) => dialog.accept());
   await page.goto("/");
