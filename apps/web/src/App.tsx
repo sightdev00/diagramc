@@ -61,6 +61,7 @@ import {
 
 const DOCUMENTS_KEY = "diagramc.documents.v1";
 const RIGHT_TAB_KEY = "diagramc.rightTab.v1";
+const UI_THEME_KEY = "diagramc.uiTheme.v1";
 
 const INITIAL_PROFILES = loadProfiles();
 const EMPTY_DOCUMENT_COLLECTION = hasEmptyDocumentCollection();
@@ -121,6 +122,13 @@ const ELEMENT_TEMPLATES = [
   },
 ] as const;
 type ElementTemplateId = (typeof ELEMENT_TEMPLATES)[number]["id"];
+const UI_THEME_OPTIONS = [
+  { id: "soft", label: "柔和" },
+  { id: "contrast", label: "高对比" },
+  { id: "night", label: "夜间" },
+  { id: "warm", label: "暖纸" },
+] as const;
+type UiTheme = (typeof UI_THEME_OPTIONS)[number]["id"];
 type AlignmentCommand =
   | "left"
   | "center"
@@ -304,6 +312,17 @@ function loadDocumentCollection(fallback: DiagramDocument): DiagramDocument[] {
   return [fallback];
 }
 
+function loadUiTheme(): UiTheme {
+  try {
+    const savedTheme = window.localStorage.getItem(UI_THEME_KEY);
+    return (
+      UI_THEME_OPTIONS.find((theme) => theme.id === savedTheme)?.id ?? "soft"
+    );
+  } catch {
+    return "soft";
+  }
+}
+
 function loadRightTab(): "inspect" | "ai" {
   try {
     return window.localStorage.getItem(RIGHT_TAB_KEY) === "ai"
@@ -346,6 +365,7 @@ export function App() {
   const sharedHistoryTimerRef = useRef<number | undefined>(undefined);
   const sharedSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const sourceImportTriggerRef = useRef<HTMLElement | null>(null);
+  const importMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const deletedDocumentIdsRef = useRef(new Set<string>());
 
   const [document, setDocument] = useState<DiagramDocument | undefined>(
@@ -364,6 +384,7 @@ export function App() {
     SAVED_DOCUMENT ? "已恢复上次工作区" : "空白工作区已就绪",
   );
   const [rightTab, setRightTab] = useState<"inspect" | "ai">(INITIAL_RIGHT_TAB);
+  const [uiTheme, setUiTheme] = useState<UiTheme>(loadUiTheme);
   const [profiles, setProfiles] = useState<ModelProfile[]>(INITIAL_PROFILES);
   const [activeProfileId, setActiveProfileId] = useState(() =>
     loadActiveProfileId(INITIAL_PROFILES),
@@ -377,6 +398,7 @@ export function App() {
       : "描述修改意图，AI 将只返回可审查的图命令。",
   );
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiRetryAfter, setAiRetryAfter] = useState(0);
   const [aiReplayLoading, setAiReplayLoading] = useState(false);
   const [aiMode, setAiMode] = useState<"replace" | "modify">("replace");
   const [commandHistory, setCommandHistory] = useState<AiCommandRecord[]>(
@@ -391,6 +413,8 @@ export function App() {
   const [sourceImportKind, setSourceImportKind] = useState<
     SourceImportKind | undefined
   >();
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false);
   const [arrangeOptionsOpen, setArrangeOptionsOpen] = useState(false);
   const [exportNameDraft, setExportNameDraft] = useState("");
@@ -578,6 +602,23 @@ export function App() {
       setStatus("图纸列表保存失败：请导出 JSON 以免内容丢失。");
     }
   }, [documents]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(UI_THEME_KEY, uiTheme);
+    } catch {
+      // The UI theme is non-critical when storage is disabled.
+    }
+  }, [uiTheme]);
+
+  useEffect(() => {
+    if (!aiRetryAfter) return;
+    const timer = window.setTimeout(
+      () => setAiRetryAfter((seconds) => Math.max(0, seconds - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [aiRetryAfter]);
 
   useEffect(() => {
     try {
@@ -1660,13 +1701,45 @@ export function App() {
         return;
       }
       if (event.key === "Escape") {
+        if (fileMenuOpen || importMenuOpen || exportOptionsOpen) {
+          setFileMenuOpen(false);
+          setImportMenuOpen(false);
+          setExportOptionsOpen(false);
+          setStatus("已关闭菜单");
+          return;
+        }
         setSelectedIds([]);
         setStatus("已取消选择");
       }
     };
     window.addEventListener("keydown", onShortcut);
     return () => window.removeEventListener("keydown", onShortcut);
-  }, [document, selectedIds, undo, redo]);
+  }, [
+    document,
+    selectedIds,
+    undo,
+    redo,
+    fileMenuOpen,
+    importMenuOpen,
+    exportOptionsOpen,
+  ]);
+
+  useEffect(() => {
+    const closeMenusOnOutsidePointer = (event: MouseEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest(".file-control, .import-control, .export-control")
+      )
+        return;
+      setFileMenuOpen(false);
+      setImportMenuOpen(false);
+      setExportOptionsOpen(false);
+    };
+    window.addEventListener("mousedown", closeMenusOnOutsidePointer);
+    return () =>
+      window.removeEventListener("mousedown", closeMenusOnOutsidePointer);
+  }, []);
 
   const exportFileStem = () => {
     const fallback =
@@ -1958,7 +2031,7 @@ export function App() {
   };
 
   const askAi = async () => {
-    if (!document || !aiPrompt.trim()) return;
+    if (!document || !aiPrompt.trim() || aiRetryAfter > 0) return;
     setAiStatus("正在通过 Provider Gateway 生成命令预览…");
     setAiLoading(true);
     setAiProposal(undefined);
@@ -1975,13 +2048,25 @@ export function App() {
       });
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
+        retryAfter?: number;
         summary?: string;
         operations?: unknown[];
         transaction?: Record<string, unknown>;
         document?: DiagramDocument;
       };
+      if (response.status === 429) {
+        const retryAfter = Number(
+          response.headers.get("Retry-After") ?? payload.retryAfter ?? 1,
+        );
+        const seconds = Number.isFinite(retryAfter)
+          ? Math.max(1, Math.ceil(retryAfter))
+          : 1;
+        setAiRetryAfter(seconds);
+        setAiStatus("本地网关请求过于频繁，请在 " + seconds + " 秒后重试。");
+        return;
+      }
       if (!response.ok)
-        throw new Error(payload.error || `Gateway HTTP ${response.status}`);
+        throw new Error(payload.error || "Gateway HTTP " + response.status);
       const result = payload;
       setAiStatus(
         `命令草案：${result.summary ?? "未命名"}（${result.operations?.length ?? 0} 个操作，尚未应用）`,
@@ -2193,7 +2278,7 @@ export function App() {
     document?.elements.filter((element) => element.kind !== "group") ?? [];
 
   return (
-    <div className="studio-shell">
+    <div className={`studio-shell ui-${uiTheme}`}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark">D</span>
@@ -2227,69 +2312,150 @@ export function App() {
           <small>r{document?.document.revision ?? 0}</small>
         </div>
         <div className="top-actions">
-          <select
-            aria-label="切换图纸"
-            className="diagram-switcher"
-            value={document?.document.id ?? ""}
-            onChange={(event) => switchDocument(event.target.value)}
-            title="切换图纸"
-            disabled={documents.length === 0}
-          >
-            {documents.length === 0 && <option value="">无图纸</option>}
-            {documents.map((item) => (
-              <option key={item.document.id} value={item.document.id}>
-                {item.document.title || "未命名图"}
-              </option>
-            ))}
-          </select>
-          <button
-            className="quiet"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            导入 JSON
-          </button>
-          <select
-            aria-label="SVG 导入模式"
-            className="svg-import-mode"
-            value={svgImportMode}
-            onChange={(event) =>
-              setSvgImportMode(event.target.value as "fidelity" | "structured")
-            }
-            title="保真模式保留原图；结构化模式转换为节点和连线"
-          >
-            <option value="fidelity">SVG：保真</option>
-            <option value="structured">SVG：结构</option>
-          </select>
-          <button
-            className="quiet"
-            onClick={() => svgInputRef.current?.click()}
-          >
-            导入 SVG
-          </button>
-          <button
-            className="quiet"
-            onClick={(event) =>
-              openSourceImport("mermaid", event.currentTarget)
-            }
-          >
-            {"\u5e94\u7528 Mermaid"}
-          </button>
-          <button
-            className="quiet"
-            onClick={(event) => openSourceImport("svg", event.currentTarget)}
-          >
-            {"\u5e94\u7528 SVG"}
-          </button>
-          <button className="quiet" onClick={newBlankDocument}>
-            新建图
-          </button>
-          <button
-            className="quiet"
-            disabled={!document}
-            onClick={deleteCurrentDocument}
-          >
-            删除图
-          </button>
+          <div className="file-control">
+            <button
+              className="quiet"
+              aria-controls="file-menu"
+              aria-expanded={fileMenuOpen}
+              onClick={() => {
+                setFileMenuOpen((open) => (open ? false : true));
+                setImportMenuOpen(false);
+                setExportOptionsOpen(false);
+              }}
+            >
+              文件 ▾
+            </button>
+            {fileMenuOpen && (
+              <div className="file-menu" id="file-menu">
+                <div className="menu-heading">
+                  <strong>图纸</strong>
+                  <small>{documents.length} 张</small>
+                </div>
+                <label className="menu-field">
+                  当前图纸
+                  <select
+                    aria-label="切换图纸"
+                    className="diagram-switcher"
+                    value={document?.document.id ?? ""}
+                    onChange={(event) => {
+                      switchDocument(event.target.value);
+                      setFileMenuOpen(false);
+                    }}
+                    disabled={documents.length === 0}
+                  >
+                    {documents.length === 0 && <option value="">无图纸</option>}
+                    {documents.map((item) => (
+                      <option key={item.document.id} value={item.document.id}>
+                        {item.document.title || "未命名图"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="menu-actions">
+                  <button
+                    onClick={() => {
+                      newBlankDocument();
+                      setFileMenuOpen(false);
+                    }}
+                  >
+                    新建图
+                  </button>
+                  <button
+                    className="danger"
+                    disabled={document === undefined}
+                    onClick={() => {
+                      deleteCurrentDocument();
+                      setFileMenuOpen(false);
+                    }}
+                  >
+                    删除当前图
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="import-control">
+            <button
+              className="quiet"
+              ref={importMenuTriggerRef}
+              aria-controls="import-menu"
+              aria-expanded={importMenuOpen}
+              onClick={() => {
+                setImportMenuOpen((open) => (open ? false : true));
+                setFileMenuOpen(false);
+                setExportOptionsOpen(false);
+              }}
+            >
+              导入 ▾
+            </button>
+            {importMenuOpen && (
+              <div className="import-menu" id="import-menu">
+                <div className="menu-heading">
+                  <strong>导入</strong>
+                  <small>文件或源码</small>
+                </div>
+                <button
+                  className="menu-wide-button"
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setImportMenuOpen(false);
+                  }}
+                >
+                  导入 DiagramC JSON
+                </button>
+                <label className="menu-field">
+                  SVG 导入方式
+                  <select
+                    aria-label="SVG 导入模式"
+                    className="svg-import-mode"
+                    value={svgImportMode}
+                    onChange={(event) =>
+                      setSvgImportMode(
+                        event.target.value as "fidelity" | "structured",
+                      )
+                    }
+                  >
+                    <option value="fidelity">保真：保留原图外观</option>
+                    <option value="structured">结构：转为节点与连线</option>
+                  </select>
+                </label>
+                <button
+                  className="menu-wide-button"
+                  onClick={() => {
+                    svgInputRef.current?.click();
+                    setImportMenuOpen(false);
+                  }}
+                >
+                  导入 SVG 文件
+                </button>
+                <div className="menu-divider" />
+                <button
+                  className="menu-wide-button"
+                  onClick={(event) => {
+                    openSourceImport(
+                      "mermaid",
+                      importMenuTriggerRef.current ?? event.currentTarget,
+                    );
+                    setImportMenuOpen(false);
+                  }}
+                >
+                  粘贴 Mermaid 源码
+                </button>
+                <button
+                  className="menu-wide-button"
+                  onClick={(event) => {
+                    openSourceImport(
+                      "svg",
+                      importMenuTriggerRef.current ?? event.currentTarget,
+                    );
+                    setImportMenuOpen(false);
+                  }}
+                >
+                  粘贴 SVG 源码
+                </button>
+              </div>
+            )}
+          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -2304,29 +2470,24 @@ export function App() {
             hidden
             onChange={openSvgFile}
           />
-          <button className="quiet" disabled={!document} onClick={exportJson}>
-            导出 JSON
-          </button>
-          <button className="quiet" disabled={!document} onClick={exportSvg}>
-            导出 SVG
-          </button>
-          <button className="quiet" disabled={!document} onClick={exportPng}>
-            导出 PNG
-          </button>
           <div className="export-control">
             <button
               className="quiet"
               aria-controls="export-options"
               aria-expanded={exportOptionsOpen}
-              disabled={!document}
-              onClick={() => setExportOptionsOpen((open) => !open)}
+              disabled={document === undefined}
+              onClick={() => {
+                setExportOptionsOpen((open) => (open ? false : true));
+                setFileMenuOpen(false);
+                setImportMenuOpen(false);
+              }}
             >
-              导出设置 ▾
+              导出 ▾
             </button>
             {exportOptionsOpen && (
               <div className="export-menu" id="export-options">
                 <div className="export-menu-heading">
-                  <strong>导出设置</strong>
+                  <strong>导出</strong>
                   <button
                     className="quiet"
                     onClick={() => setExportOptionsOpen(false)}
@@ -2583,7 +2744,7 @@ export function App() {
           <button onClick={fitCanvas}>适应</button>
         </div>
         <div className="tool-group theme-switch">
-          <span>视觉主题</span>
+          <span>画布主题</span>
           <select
             value={activeTheme}
             onChange={(event) =>
@@ -2591,6 +2752,20 @@ export function App() {
             }
           >
             {CANVAS_THEME_OPTIONS.map((theme) => (
+              <option key={theme.id} value={theme.id}>
+                {theme.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="tool-group ui-theme-switch">
+          <span>界面</span>
+          <select
+            aria-label="界面主题"
+            value={uiTheme}
+            onChange={(event) => setUiTheme(event.target.value as UiTheme)}
+          >
+            {UI_THEME_OPTIONS.map((theme) => (
               <option key={theme.id} value={theme.id}>
                 {theme.label}
               </option>
@@ -2844,10 +3019,14 @@ export function App() {
               </label>
               <button
                 className="primary ai-submit"
-                disabled={!aiPrompt.trim() || aiLoading}
+                disabled={!aiPrompt.trim() || aiLoading || aiRetryAfter > 0}
                 onClick={askAi}
               >
-                {aiLoading ? "模型生成中，请稍候…" : "生成命令预览"}
+                {aiLoading
+                  ? "模型生成中，请稍候…"
+                  : aiRetryAfter > 0
+                    ? "请求受限，请等待 " + aiRetryAfter + " 秒"
+                    : "生成命令预览"}
               </button>
               <div className="ai-status">{aiStatus}</div>
               {aiProposal && (

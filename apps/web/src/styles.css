@@ -120,16 +120,80 @@ button {
   display: flex;
   gap: 6px;
 }
+.file-control,
+.import-control,
 .export-control {
   position: relative;
+}
+.file-menu,
+.import-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 20;
+  width: min(248px, calc(100vw - 24px));
+  max-height: calc(100dvh - 82px);
+  padding: 12px;
+  overflow-y: auto;
+  color: #3c403c;
+  background: #f8f7f3;
+  border: 1px solid #bdb9ae;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgb(24 31 28 / 24%);
+}
+.file-menu,
+.import-menu {
+  right: 0;
+}
+.menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.menu-heading strong {
+  color: #31483f;
+  font-size: 12px;
+}
+.menu-heading small,
+.menu-field {
+  color: #65625b;
+  font-size: 10px;
+}
+.menu-field {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+.menu-field select {
+  min-height: 31px;
+  margin: 0;
+  background: #fffef9;
+}
+.menu-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.menu-wide-button {
+  width: 100%;
+  min-height: 31px;
+  margin: 3px 0;
+  text-align: left;
+}
+.menu-divider {
+  height: 1px;
+  margin: 9px 0;
+  background: #dedbd3;
 }
 .export-menu {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   z-index: 20;
-  width: 268px;
+  width: min(268px, calc(100vw - 24px));
+  max-height: calc(100dvh - 82px);
   padding: 12px;
+  overflow-y: auto;
   color: #3c403c;
   background: #f8f7f3;
   border: 1px solid #bdb9ae;
@@ -222,6 +286,23 @@ button {
   background: #2b3834;
   font-size: 10px;
 }
+.file-menu .diagram-switcher,
+.import-menu .svg-import-mode {
+  width: 100%;
+  color: #2a302d;
+  border-color: #bdb9ae;
+  background: #fffef9;
+}
+.file-menu button:not(.danger),
+.import-menu button,
+.export-menu button:not(.primary) {
+  color: #2a302d;
+  border-color: #c8c5bc;
+  background: #fffef9;
+}
+.export-menu button.quiet {
+  color: #56635f;
+}
 button {
   min-height: 30px;
   padding: 5px 11px;
@@ -274,11 +355,13 @@ button.primary {
 }
 .layout-switch,
 .theme-switch,
+.ui-theme-switch,
 .zoom-switch {
   align-items: center;
 }
 .layout-switch span,
 .theme-switch span,
+.ui-theme-switch span,
 .zoom-switch span {
   margin-right: 3px;
   color: #78766f;
@@ -290,7 +373,8 @@ button.primary {
   border-color: #4b6660;
   background: #4b6660;
 }
-.theme-switch select {
+.theme-switch select,
+.ui-theme-switch select {
   width: 112px;
   min-height: 31px;
   margin: 0;
@@ -981,6 +1065,11 @@ button.danger {
   display: grid;
   gap: 4px;
 }
+.source-import-dialog button.quiet {
+  color: #3c403c;
+  border-color: #a7aaa0;
+  background: #fffef9;
+}
 .source-import-heading small,
 .source-import-actions small {
   color: #74756d;
@@ -1019,4 +1108,371 @@ button.danger {
 }
 .svg-diagnostics li + li {
   margin-top: 3px;
+}
+
+.ui-contrast {
+  color: #101828;
+  background: #ffffff;
+}
+.ui-contrast .topbar {
+  color: #ffffff;
+  background: #0b1f3a;
+  border-bottom-color: #294866;
+}
+.ui-contrast .brand small,
+.ui-contrast .document-title small {
+  color: #d7e4f2;
+}
+.ui-contrast .document-title {
+  color: #ffffff;
+}
+.ui-contrast .document-title-input {
+  color: #ffffff;
+  background: #18395c;
+}
+.ui-contrast .document-title-input:hover {
+  border-color: #a8c5df;
+  background: #18395c;
+}
+.ui-contrast .document-title-input:focus {
+  color: #101828;
+  border-color: #5b92c2;
+  background: #ffffff;
+}
+.ui-contrast .toolbar,
+.ui-contrast .outline-panel,
+.ui-contrast .right-panel,
+.ui-contrast .canvas-wrap {
+  background: #ffffff;
+  border-color: #9aacbd;
+}
+.ui-contrast .toolbar {
+  box-shadow: none;
+}
+.ui-contrast .tool-group {
+  border-color: #b4c2d0;
+}
+.ui-contrast .tool-group span,
+.ui-contrast .toolbar-status,
+.ui-contrast label {
+  color: #26384a;
+}
+.ui-contrast button {
+  color: #14263a;
+  border-color: #62788f;
+  background: #ffffff;
+}
+.ui-contrast button.quiet {
+  color: #ffffff;
+  border-color: #91aec8;
+  background: transparent;
+}
+.ui-contrast button.primary {
+  color: #ffffff;
+  border-color: #0a5ca8;
+  background: #0a5ca8;
+}
+.ui-contrast .layout-switch button.active {
+  color: #ffffff;
+  border-color: #0a5ca8;
+  background: #0a5ca8;
+}
+.ui-contrast input,
+.ui-contrast select,
+.ui-contrast textarea,
+.ui-contrast .element-picker,
+.ui-contrast .theme-switch select,
+.ui-contrast .ui-theme-switch select,
+.ui-contrast .relation-font-size input {
+  color: #101828;
+  border-color: #62788f;
+  background: #ffffff;
+}
+.ui-contrast .file-menu,
+.ui-contrast .import-menu,
+.ui-contrast .export-menu,
+.ui-contrast .arrange-menu {
+  color: #101828;
+  background: #ffffff;
+  border-color: #62788f;
+  box-shadow: 0 12px 30px rgb(15 35 55 / 28%);
+}
+.ui-contrast .file-menu .diagram-switcher,
+.ui-contrast .import-menu .svg-import-mode,
+.ui-contrast .file-menu button:not(.danger),
+.ui-contrast .import-menu button,
+.ui-contrast .export-menu button:not(.primary),
+.ui-contrast .arrange-menu button {
+  color: #101828;
+  border-color: #62788f;
+  background: #ffffff;
+}
+.ui-contrast .export-menu button.quiet {
+  color: #14263a;
+}
+.ui-contrast .menu-heading strong,
+.ui-contrast .export-menu-heading strong,
+.ui-contrast .panel-heading span,
+.ui-contrast .empty-panel strong,
+.ui-contrast .ai-intro strong {
+  color: #102f50;
+}
+.ui-contrast .menu-heading small,
+.ui-contrast .menu-field,
+.ui-contrast .export-menu .export-field,
+.ui-contrast .export-check,
+.ui-contrast .panel-heading small,
+.ui-contrast .selection-kicker,
+.ui-contrast .empty-panel,
+.ui-contrast .ai-intro p {
+  color: #40566e;
+}
+
+.ui-contrast .source-import-dialog button.quiet {
+  color: #14263a;
+  border-color: #62788f;
+  background: #ffffff;
+}
+
+.ui-night {
+  color: #e7edf5;
+  background: #0f1722;
+}
+.ui-night .topbar {
+  color: #f5f8fc;
+  background: #08111d;
+  border-bottom-color: #304b66;
+}
+.ui-night .brand small,
+.ui-night .document-title small {
+  color: #b7cbe0;
+}
+.ui-night .document-title {
+  color: #f5f8fc;
+}
+.ui-night .document-title-input {
+  color: #f5f8fc;
+  background: #162b45;
+}
+.ui-night .document-title-input:hover {
+  border-color: #82a9cd;
+  background: #1b3655;
+}
+.ui-night .document-title-input:focus {
+  color: #101828;
+  border-color: #76a6d2;
+  background: #ffffff;
+}
+.ui-night .toolbar,
+.ui-night .outline-panel,
+.ui-night .right-panel,
+.ui-night .canvas-wrap,
+.ui-night .source-import-dialog {
+  color: #e7edf5;
+  background: #172231;
+  border-color: #39526c;
+}
+.ui-night .toolbar {
+  box-shadow: none;
+}
+.ui-night .tool-group,
+.ui-night .panel-heading,
+.ui-night .tabs,
+.ui-night .outline-relations,
+.ui-night .ai-intro,
+.ui-night .command-history {
+  border-color: #39526c;
+}
+.ui-night .tool-group span,
+.ui-night .toolbar-status,
+.ui-night label,
+.ui-night .menu-field,
+.ui-night .export-menu .export-field,
+.ui-night .export-check,
+.ui-night .panel-heading small,
+.ui-night .selection-kicker,
+.ui-night .empty-panel,
+.ui-night .source-import-heading small,
+.ui-night .source-import-actions small,
+.ui-night .ai-intro p,
+.ui-night .proposal-card small,
+.ui-night .history-heading small,
+.ui-night .history-item small {
+  color: #aec0d2;
+}
+.ui-night button {
+  color: #e7edf5;
+  border-color: #54708a;
+  background: #213247;
+}
+.ui-night button.quiet {
+  color: #f5f8fc;
+  border-color: #6b8eae;
+  background: transparent;
+}
+.ui-night button.primary,
+.ui-night .layout-switch button.active {
+  color: #ffffff;
+  border-color: #1674c4;
+  background: #1674c4;
+}
+.ui-night input,
+.ui-night select,
+.ui-night textarea,
+.ui-night .element-picker,
+.ui-night .theme-switch select,
+.ui-night .ui-theme-switch select,
+.ui-night .relation-font-size input {
+  color: #e7edf5;
+  border-color: #54708a;
+  background: #101b29;
+}
+.ui-night .file-menu,
+.ui-night .import-menu,
+.ui-night .export-menu,
+.ui-night .arrange-menu {
+  color: #e7edf5;
+  background: #172231;
+  border-color: #54708a;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 42%);
+}
+.ui-night .file-menu .diagram-switcher,
+.ui-night .import-menu .svg-import-mode,
+.ui-night .file-menu button:not(.danger),
+.ui-night .import-menu button,
+.ui-night .export-menu button:not(.primary),
+.ui-night .arrange-menu button,
+.ui-night .source-import-dialog button.quiet {
+  color: #e7edf5;
+  border-color: #54708a;
+  background: #213247;
+}
+.ui-night .menu-heading strong,
+.ui-night .export-menu-heading strong,
+.ui-night .panel-heading span,
+.ui-night .empty-panel strong,
+.ui-night .ai-intro strong,
+.ui-night .history-heading,
+.ui-night .proposal-card > div:first-child {
+  color: #f5f8fc;
+}
+.ui-night .outline-group > button,
+.ui-night .outline-node,
+.ui-night .outline-relations button,
+.ui-night .tabs button {
+  color: #cbd9e8;
+}
+.ui-night .outline-group button.selected,
+.ui-night .outline-node.selected,
+.ui-night .outline-relations button.selected {
+  color: #ffffff;
+  background: #264e70;
+}
+.ui-night .tabs button.active {
+  color: #ffffff;
+  border-bottom-color: #55a7ed;
+}
+.ui-night .batch-tip,
+.ui-night .proposal-card,
+.ui-night .ai-status,
+.ui-night .history-item,
+.ui-night .history-empty,
+.ui-night .inspector-note,
+.ui-night .privacy-note {
+  color: #d6e2ee;
+  background: #1e2d3e;
+  border-color: #54708a;
+}
+.ui-night .proposal-card pre {
+  color: #d6e2ee;
+  background: #101b29;
+}
+
+.ui-warm {
+  color: #3f3028;
+  background: #f4eadc;
+}
+.ui-warm .topbar {
+  color: #fff8ed;
+  background: #573a29;
+  border-bottom-color: #805a41;
+}
+.ui-warm .brand small,
+.ui-warm .document-title small {
+  color: #f0d7b6;
+}
+.ui-warm .document-title {
+  color: #fff8ed;
+}
+.ui-warm .document-title-input {
+  color: #fff8ed;
+  background: #684834;
+}
+.ui-warm .document-title-input:hover {
+  border-color: #e2bf8b;
+  background: #76523a;
+}
+.ui-warm .document-title-input:focus {
+  color: #3f3028;
+  border-color: #b77847;
+  background: #fffaf2;
+}
+.ui-warm .toolbar,
+.ui-warm .outline-panel,
+.ui-warm .right-panel,
+.ui-warm .canvas-wrap,
+.ui-warm .source-import-dialog {
+  background: #f9f1e5;
+  border-color: #d9c5aa;
+}
+.ui-warm .tool-group,
+.ui-warm .panel-heading,
+.ui-warm .tabs,
+.ui-warm .outline-relations,
+.ui-warm .ai-intro,
+.ui-warm .command-history {
+  border-color: #d9c5aa;
+}
+.ui-warm button,
+.ui-warm input,
+.ui-warm select,
+.ui-warm textarea,
+.ui-warm .element-picker,
+.ui-warm .theme-switch select,
+.ui-warm .ui-theme-switch select,
+.ui-warm .relation-font-size input {
+  color: #49362b;
+  border-color: #cdb797;
+  background: #fffaf2;
+}
+.ui-warm button.quiet {
+  color: #fff8ed;
+  border-color: #d9b68a;
+  background: transparent;
+}
+.ui-warm button.primary,
+.ui-warm .layout-switch button.active {
+  color: #ffffff;
+  border-color: #9b5d34;
+  background: #9b5d34;
+}
+.ui-warm .file-menu,
+.ui-warm .import-menu,
+.ui-warm .export-menu,
+.ui-warm .arrange-menu {
+  color: #49362b;
+  background: #fff9ef;
+  border-color: #cdb797;
+  box-shadow: 0 12px 30px rgb(83 54 36 / 24%);
+}
+.ui-warm .file-menu .diagram-switcher,
+.ui-warm .import-menu .svg-import-mode,
+.ui-warm .file-menu button:not(.danger),
+.ui-warm .import-menu button,
+.ui-warm .export-menu button:not(.primary),
+.ui-warm .arrange-menu button,
+.ui-warm .source-import-dialog button.quiet {
+  color: #49362b;
+  border-color: #cdb797;
+  background: #fffaf2;
 }

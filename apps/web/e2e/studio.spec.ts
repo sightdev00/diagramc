@@ -38,6 +38,7 @@ test("creates, renames, edits, and exports a diagram", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByText("DiagramC", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "文件 ▾" }).click();
   await page.getByRole("button", { name: "新建图" }).click();
 
   const title = page.getByLabel("图名称");
@@ -49,18 +50,21 @@ test("creates, renames, edits, and exports a diagram", async ({ page }) => {
   await page.getByRole("button", { name: "＋ 添加" }).click();
   await expect(page.getByRole("button", { name: "↶ 撤销" })).toBeEnabled();
 
+  await page.getByRole("button", { name: "导出 ▾" }).click();
   const jsonDownload = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "导出 JSON" }).click(),
   ]);
   expect(jsonDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.json/);
 
+  await page.getByRole("button", { name: "导出 ▾" }).click();
   const svgDownload = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "导出 SVG" }).click(),
   ]);
   expect(svgDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.svg/);
 
+  await page.getByRole("button", { name: "导出 ▾" }).click();
   const pngDownload = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "导出 PNG" }).click(),
@@ -68,21 +72,109 @@ test("creates, renames, edits, and exports a diagram", async ({ page }) => {
   expect(pngDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.png/);
 });
 
+test("keeps document menus mutually exclusive and dismissible", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "文件 ▾" }).click();
+  await expect(page.locator("#file-menu")).toBeVisible();
+  await page.getByRole("button", { name: "导入 ▾" }).click();
+  await expect(page.locator("#file-menu")).toBeHidden();
+  await expect(page.locator("#import-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#import-menu")).toBeHidden();
+});
+
+test("keeps top-bar menus inside a small viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 480 });
+  await page.goto("/");
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  if (!viewport) return;
+
+  for (const [trigger, menu] of [
+    ["文件 ▾", "#file-menu"],
+    ["导入 ▾", "#import-menu"],
+    ["导出 ▾", "#export-options"],
+  ]) {
+    await page.getByRole("button", { name: trigger }).click();
+    const box = await page.locator(menu).boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+  }
+});
+
+test("persists the selected interface theme", async ({ page }) => {
+  await page.goto("/");
+  const theme = page.getByLabel("界面主题");
+  await theme.selectOption("contrast");
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-contrast/);
+
+  const title = page.getByLabel("图名称");
+  await expect(title).toHaveCSS("background-color", "rgb(24, 57, 92)");
+  await title.focus();
+  await expect(title).toHaveCSS("color", "rgb(16, 24, 40)");
+  await expect(title).toHaveCSS("background-color", "rgb(255, 255, 255)");
+
+  await page.reload();
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-contrast/);
+
+  await page.getByRole("button", { name: "导入 ▾" }).click();
+  await expect(page.locator(".import-menu .svg-import-mode")).toBeVisible();
+  await expect(page.locator(".import-menu .svg-import-mode")).toHaveCSS(
+    "color",
+    "rgb(16, 24, 40)",
+  );
+  await page.getByRole("button", { name: "粘贴 Mermaid 源码" }).click();
+  await expect(page.getByRole("button", { name: "关闭源码导入" })).toHaveCSS(
+    "color",
+    "rgb(20, 38, 58)",
+  );
+});
+
+test("offers night and warm interface themes", async ({ page }) => {
+  await page.goto("/");
+  const theme = page.getByLabel("界面主题");
+
+  await theme.selectOption("night");
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-night/);
+  await expect(page.locator(".toolbar")).toHaveCSS(
+    "background-color",
+    "rgb(23, 34, 49)",
+  );
+
+  await theme.selectOption("warm");
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-warm/);
+  await expect(page.locator(".topbar")).toHaveCSS(
+    "background-color",
+    "rgb(87, 58, 41)",
+  );
+
+  await page.reload();
+  await expect(page.locator(".studio-shell")).toHaveClass(/ui-warm/);
+});
+
 test("deletes the last diagram from the list", async ({ page }) => {
   page.on("dialog", (dialog) => dialog.accept());
   await page.goto("/");
-  await page.getByRole("button", { name: "删除图" }).click();
+  await page.getByRole("button", { name: "文件 ▾" }).click();
+  await page.getByRole("button", { name: "删除当前图" }).click();
 
+  await page.getByRole("button", { name: "文件 ▾" }).click();
   const switcher = page.getByLabel("切换图纸");
   await expect(switcher).toBeDisabled();
   await expect(switcher).toContainText("无图纸");
   await expect(page.getByLabel("图名称")).toBeDisabled();
 
   await page.reload();
+  await page.getByRole("button", { name: "文件 ▾" }).click();
   await expect(switcher).toBeDisabled();
   await expect(switcher).toContainText("无图纸");
 
   await page.getByRole("button", { name: "新建图" }).click();
+  await page.getByRole("button", { name: "文件 ▾" }).click();
   await expect(switcher).toBeEnabled();
   await expect(switcher.locator("option")).toHaveCount(1);
 });
@@ -127,7 +219,8 @@ test("shows resize handles for a selected node", async ({ page }) => {
 
 test("imports an editable Mermaid flowchart source", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "应用 Mermaid" }).click();
+  await page.getByRole("button", { name: "导入 ▾" }).click();
+  await page.getByRole("button", { name: "粘贴 Mermaid 源码" }).click();
 
   await page.getByRole("textbox", { name: "Mermaid 源码" }).fill(`%% title: AI Flow
 flowchart LR
@@ -144,7 +237,8 @@ flowchart LR
 
 test("applies SVG source and reports sanitization diagnostics", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "应用 SVG" }).click();
+  await page.getByRole("button", { name: "导入 ▾" }).click();
+  await page.getByRole("button", { name: "粘贴 SVG 源码" }).click();
 
   await page.getByRole("textbox", { name: "SVG 源码" }).fill(`
     <svg viewBox="0 0 320 160" onload="alert(1)">
@@ -162,6 +256,7 @@ test("applies SVG source and reports sanitization diagnostics", async ({ page })
 
 test("imports a structured SVG with markers as editable relations", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "导入 ▾" }).click();
   await page.locator("select.svg-import-mode").selectOption("structured");
   await page.locator(`input[accept="image/svg+xml,.svg"]`).setInputFiles({
     name: "complex-diagram.svg",
@@ -182,6 +277,24 @@ test("imports a structured SVG with markers as editable relations", async ({ pag
   await expect(page.getByLabel("图名称")).toHaveValue("complex-diagram");
   await expect(page.locator(".outline-node")).toHaveCount(2);
   await expect(page.locator(".outline-relations button")).toHaveCount(1);
+});
+
+test("shows an AI rate-limit retry countdown", async ({ page }) => {
+  await page.route("**/api/ai/commands", async (route) => {
+    await route.fulfill({
+      status: 429,
+      headers: { "Retry-After": "5" },
+      contentType: "application/json",
+      body: JSON.stringify({ error: "AI request rate limit reached" }),
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("tab", { name: /AI/ }).click();
+  await page.getByLabel("修改意图").fill("add a review step");
+  await page.getByRole("button", { name: "生成命令预览" }).click();
+
+  await expect(page.locator(".ai-status")).toContainText("本地网关请求过于频繁");
+  await expect(page.getByRole("button", { name: /请求受限，请等待/ })).toBeDisabled();
 });
 
 test("imports DiagramC JSON and previews then reapplies AI commands", async ({ page }) => {
@@ -254,8 +367,9 @@ test("imports DiagramC JSON and previews then reapplies AI commands", async ({ p
 
 test("supports keyboard dismissal and focus restoration for source import", async ({ page }) => {
   await page.goto("/");
-  const trigger = page.getByRole("button", { name: "应用 Mermaid" });
+  const trigger = page.getByRole("button", { name: "导入 ▾" });
   await trigger.click();
+  await page.getByRole("button", { name: "粘贴 Mermaid 源码" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Mermaid 源码" })).toBeFocused();
   await page.keyboard.press("Escape");
