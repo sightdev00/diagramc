@@ -279,6 +279,24 @@ test("imports a structured SVG with markers as editable relations", async ({ pag
   await expect(page.locator(".outline-relations button")).toHaveCount(1);
 });
 
+test("shows an AI rate-limit retry countdown", async ({ page }) => {
+  await page.route("**/api/ai/commands", async (route) => {
+    await route.fulfill({
+      status: 429,
+      headers: { "Retry-After": "5" },
+      contentType: "application/json",
+      body: JSON.stringify({ error: "AI request rate limit reached" }),
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("tab", { name: /AI/ }).click();
+  await page.getByLabel("修改意图").fill("add a review step");
+  await page.getByRole("button", { name: "生成命令预览" }).click();
+
+  await expect(page.locator(".ai-status")).toContainText("本地网关请求过于频繁");
+  await expect(page.getByRole("button", { name: /请求受限，请等待/ })).toBeDisabled();
+});
+
 test("imports DiagramC JSON and previews then reapplies AI commands", async ({ page }) => {
   await page.route("**/api/ai/commands", async (route) => {
     const request = route.request().postDataJSON() as { document: Record<string, unknown> };

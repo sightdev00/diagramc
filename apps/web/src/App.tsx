@@ -398,6 +398,7 @@ export function App() {
       : "描述修改意图，AI 将只返回可审查的图命令。",
   );
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiRetryAfter, setAiRetryAfter] = useState(0);
   const [aiReplayLoading, setAiReplayLoading] = useState(false);
   const [aiMode, setAiMode] = useState<"replace" | "modify">("replace");
   const [commandHistory, setCommandHistory] = useState<AiCommandRecord[]>(
@@ -609,6 +610,15 @@ export function App() {
       // The UI theme is non-critical when storage is disabled.
     }
   }, [uiTheme]);
+
+  useEffect(() => {
+    if (!aiRetryAfter) return;
+    const timer = window.setTimeout(
+      () => setAiRetryAfter((seconds) => Math.max(0, seconds - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [aiRetryAfter]);
 
   useEffect(() => {
     try {
@@ -2021,7 +2031,7 @@ export function App() {
   };
 
   const askAi = async () => {
-    if (!document || !aiPrompt.trim()) return;
+    if (!document || !aiPrompt.trim() || aiRetryAfter > 0) return;
     setAiStatus("正在通过 Provider Gateway 生成命令预览…");
     setAiLoading(true);
     setAiProposal(undefined);
@@ -2038,13 +2048,25 @@ export function App() {
       });
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
+        retryAfter?: number;
         summary?: string;
         operations?: unknown[];
         transaction?: Record<string, unknown>;
         document?: DiagramDocument;
       };
+      if (response.status === 429) {
+        const retryAfter = Number(
+          response.headers.get("Retry-After") ?? payload.retryAfter ?? 1,
+        );
+        const seconds = Number.isFinite(retryAfter)
+          ? Math.max(1, Math.ceil(retryAfter))
+          : 1;
+        setAiRetryAfter(seconds);
+        setAiStatus("本地网关请求过于频繁，请在 " + seconds + " 秒后重试。");
+        return;
+      }
       if (!response.ok)
-        throw new Error(payload.error || `Gateway HTTP ${response.status}`);
+        throw new Error(payload.error || "Gateway HTTP " + response.status);
       const result = payload;
       setAiStatus(
         `命令草案：${result.summary ?? "未命名"}（${result.operations?.length ?? 0} 个操作，尚未应用）`,
@@ -2997,10 +3019,14 @@ export function App() {
               </label>
               <button
                 className="primary ai-submit"
-                disabled={!aiPrompt.trim() || aiLoading}
+                disabled={!aiPrompt.trim() || aiLoading || aiRetryAfter > 0}
                 onClick={askAi}
               >
-                {aiLoading ? "模型生成中，请稍候…" : "生成命令预览"}
+                {aiLoading
+                  ? "模型生成中，请稍候…"
+                  : aiRetryAfter > 0
+                    ? "请求受限，请等待 " + aiRetryAfter + " 秒"
+                    : "生成命令预览"}
               </button>
               <div className="ai-status">{aiStatus}</div>
               {aiProposal && (
