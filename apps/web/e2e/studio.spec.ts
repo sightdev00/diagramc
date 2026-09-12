@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
@@ -65,11 +65,21 @@ test("creates, renames, edits, and exports a diagram", async ({ page }) => {
   expect(svgDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.svg/);
 
   await page.getByRole("button", { name: "导出 ▾" }).click();
+  await page.getByLabel("PNG 清晰度").selectOption("1");
+  const canvasBounds = await page.locator(".diagram-canvas svg").boundingBox();
+  expect(canvasBounds).not.toBeNull();
+  if (!canvasBounds) return;
   const pngDownload = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "导出 PNG" }).click(),
   ]);
   expect(pngDownload[0].suggestedFilename()).toMatch(/E2E Architecture.*\.png/);
+  const pngPath = await pngDownload[0].path();
+  expect(pngPath).not.toBeNull();
+  if (!pngPath) return;
+  const png = await readFile(pngPath);
+  expect(png.readUInt32BE(16)).toBe(Math.ceil(canvasBounds.width));
+  expect(png.readUInt32BE(20)).toBe(Math.ceil(canvasBounds.height));
 });
 
 test("keeps document menus mutually exclusive and dismissible", async ({ page }) => {

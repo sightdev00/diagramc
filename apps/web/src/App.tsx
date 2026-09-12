@@ -1755,8 +1755,15 @@ export function App() {
   const snapshotCanvasSvg = () => {
     const svg = canvasRef.current?.querySelector("svg");
     if (!svg) return undefined;
+    const bounds = svg.getBoundingClientRect();
+    const width = Math.max(1, Math.ceil(bounds.width));
+    const height = Math.max(1, Math.ceil(bounds.height));
     const snapshot = svg.cloneNode(true) as SVGSVGElement;
     snapshot.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    snapshot.setAttribute("width", String(width));
+    snapshot.setAttribute("height", String(height));
+    snapshot.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    snapshot.setAttribute("preserveAspectRatio", "none");
     if (!exportBackground) {
       snapshot
         .querySelectorAll(".x6-graph-svg-background, .x6-graph-background")
